@@ -3,7 +3,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger'
 import { PaginationDto } from '../../common/dto/pagination.dto'
 
 export class QueryProductDto extends PaginationDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Search by product name' })
   @IsOptional()
   @IsString()
   search?: string
