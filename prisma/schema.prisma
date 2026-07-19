@@ -1,0 +1,115 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role
+  marketId  String?
+  market    Market?  @relation(fields: [marketId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions Transaction[]
+}
+
+model Market {
+  id        String   @id @default(uuid())
+  name      String
+  address   String
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users        User[]
+  products     Product[]
+  debtors      Debtor[]
+  transactions Transaction[]
+}
+
+model Product {
+  id        String   @id @default(uuid())
+  name      String
+  price     Float
+  quantity  Int
+  marketId  String
+  market    Market   @relation(fields: [marketId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactionItems TransactionItem[]
+}
+
+model Debtor {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String
+  marketId  String
+  market    Market   @relation(fields: [marketId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions Transaction[]
+}
+
+model Transaction {
+  id          String            @id @default(uuid())
+  marketId    String
+  market      Market            @relation(fields: [marketId], references: [id])
+  createdById String
+  createdBy   User              @relation(fields: [createdById], references: [id])
+  debtorId    String?
+  debtor      Debtor?           @relation(fields: [debtorId], references: [id])
+  type        TransactionType
+  paymentType PaymentType
+  totalAmount Float
+  status      TransactionStatus
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  items TransactionItem[]
+}
+
+model TransactionItem {
+  id            String      @id @default(uuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id])
+  productName   String
+  quantity      Int
+  price         Float
+  totalPrice    Float
+}
+
+enum Role {
+  ADMIN
+  OWNER
+  SELLER
+}
+
+enum TransactionType {
+  SALE
+  DEBT
+}
+
+enum PaymentType {
+  CASH
+  CARD
+  CREDIT
+}
+
+enum TransactionStatus {
+  PAID
+  ACTIVE
+  PARTIAL
+}
