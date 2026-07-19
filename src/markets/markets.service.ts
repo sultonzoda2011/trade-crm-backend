@@ -1,9 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { StorageService } from '../common/services/storage.service'
 import { PaginatedResult } from '../common/dto/pagination.dto'
 import { CreateMarketDto } from './dto/create-market.dto'
 import { QueryMarketDto } from './dto/query-market.dto'
 import { UpdateMarketDto } from './dto/update-market.dto'
+import { Express } from 'express'
 
 const marketInclude = {
   users: { select: { id: true, name: true, email: true, role: true } },
@@ -14,7 +16,10 @@ const ownerSelect = { id: true, name: true, email: true, role: true } as const
 
 @Injectable()
 export class MarketsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storageService: StorageService,
+  ) {}
 
   private async enrichMarket(market: any) {
     const owner = await this.prisma.user.findUnique({
@@ -38,12 +43,14 @@ export class MarketsService {
     })
   }
 
-  async create(dto: CreateMarketDto, ownerId?: string) {
+  async create(dto: CreateMarketDto, file: Express.Multer.File, ownerId?: string) {
     const resolvedOwnerId = dto.ownerId ?? ownerId
     if (!resolvedOwnerId) throw new NotFoundException('Owner ID is required')
 
+    const image = file ? this.storageService.save(file, 'markets') : undefined
+
     const market = await this.prisma.market.create({
-      data: { ...dto, ownerId: resolvedOwnerId },
+      data: { ...dto, image, ownerId: resolvedOwnerId },
       include: marketInclude,
     })
 
@@ -100,12 +107,21 @@ export class MarketsService {
     return this.enrichMarket(market)
   }
 
-  async update(id: string, dto: UpdateMarketDto) {
+  async update(id: string, dto: UpdateMarketDto, file: Express.Multer.File) {
     const existing = await this.prisma.market.findUnique({
       where: { id },
       include: marketInclude,
     })
     if (!existing) throw new NotFoundException('Market not found')
+
+    const data: any = { ...dto }
+
+    if (file) {
+      if (existing.image) {
+        this.storageService.delete(existing.image)
+      }
+      data.image = this.storageService.save(file, 'markets')
+    }
 
     if (dto.ownerId && dto.ownerId !== existing.ownerId) {
       await this.prisma.user.update({
@@ -120,7 +136,7 @@ export class MarketsService {
 
     const updated = await this.prisma.market.update({
       where: { id },
-      data: dto,
+      data,
       include: marketInclude,
     })
 
@@ -133,6 +149,10 @@ export class MarketsService {
       include: marketInclude,
     })
     if (!market) throw new NotFoundException('Market not found')
+
+    if (market.image) {
+      this.storageService.delete(market.image)
+    }
 
     await this.prisma.user.update({
       where: { id: market.ownerId },
