@@ -1,9 +1,11 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { StorageService } from '../common/services/storage.service'
 import { PaginatedResult } from '../common/dto/pagination.dto'
 import { CreateProductDto } from './dto/create-product.dto'
 import { QueryProductDto } from './dto/query-product.dto'
 import { UpdateProductDto } from './dto/update-product.dto'
+import { Express } from 'express'
 
 const productInclude = {
   market: { select: { id: true, name: true, address: true } },
@@ -12,11 +14,15 @@ const productInclude = {
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storageService: StorageService,
+  ) {}
 
-  async create(dto: CreateProductDto, marketId?: string) {
+  async create(dto: CreateProductDto, file: Express.Multer.File, marketId?: string) {
     if (!marketId) throw new UnauthorizedException('User is not assigned to a market')
-    return this.prisma.product.create({ data: { ...dto, marketId }, include: productInclude })
+    const image = file ? this.storageService.save(file, 'products') : undefined
+    return this.prisma.product.create({ data: { ...dto, image, marketId }, include: productInclude })
   }
 
   async findAll(query: QueryProductDto, userMarketId?: string): Promise<PaginatedResult<unknown>> {
@@ -65,13 +71,28 @@ export class ProductsService {
     return product
   }
 
-  async update(id: string, dto: UpdateProductDto, userMarketId?: string) {
-    await this.findOne(id, userMarketId)
-    return this.prisma.product.update({ where: { id }, data: dto, include: productInclude })
+  async update(id: string, dto: UpdateProductDto, file: Express.Multer.File, userMarketId?: string) {
+    const product = await this.findOne(id, userMarketId)
+
+    const data: any = { ...dto }
+
+    if (file) {
+      if (product.image) {
+        this.storageService.delete(product.image)
+      }
+      data.image = this.storageService.save(file, 'products')
+    }
+
+    return this.prisma.product.update({ where: { id }, data, include: productInclude })
   }
 
   async remove(id: string, userMarketId?: string) {
-    await this.findOne(id, userMarketId)
+    const product = await this.findOne(id, userMarketId)
+
+    if (product.image) {
+      this.storageService.delete(product.image)
+    }
+
     await this.prisma.product.delete({ where: { id } })
   }
 }
