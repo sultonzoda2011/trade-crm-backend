@@ -28,6 +28,7 @@ export type MarketMinAggregateOutputType = {
   id: string | null
   name: string | null
   address: string | null
+  image: string | null
   ownerId: string | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -37,6 +38,7 @@ export type MarketMaxAggregateOutputType = {
   id: string | null
   name: string | null
   address: string | null
+  image: string | null
   ownerId: string | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -46,6 +48,7 @@ export type MarketCountAggregateOutputType = {
   id: number
   name: number
   address: number
+  image: number
   ownerId: number
   createdAt: number
   updatedAt: number
@@ -57,6 +60,7 @@ export type MarketMinAggregateInputType = {
   id?: true
   name?: true
   address?: true
+  image?: true
   ownerId?: true
   createdAt?: true
   updatedAt?: true
@@ -66,6 +70,7 @@ export type MarketMaxAggregateInputType = {
   id?: true
   name?: true
   address?: true
+  image?: true
   ownerId?: true
   createdAt?: true
   updatedAt?: true
@@ -75,6 +80,7 @@ export type MarketCountAggregateInputType = {
   id?: true
   name?: true
   address?: true
+  image?: true
   ownerId?: true
   createdAt?: true
   updatedAt?: true
@@ -157,6 +163,7 @@ export type MarketGroupByOutputType = {
   id: string
   name: string
   address: string
+  image: string | null
   ownerId: string
   createdAt: Date
   updatedAt: Date
@@ -187,9 +194,11 @@ export type MarketWhereInput = {
   id?: Prisma.StringFilter<"Market"> | string
   name?: Prisma.StringFilter<"Market"> | string
   address?: Prisma.StringFilter<"Market"> | string
+  image?: Prisma.StringNullableFilter<"Market"> | string | null
   ownerId?: Prisma.StringFilter<"Market"> | string
   createdAt?: Prisma.DateTimeFilter<"Market"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Market"> | Date | string
+  owner?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   debtors?: Prisma.DebtorListRelationFilter
   products?: Prisma.ProductListRelationFilter
   transactions?: Prisma.TransactionListRelationFilter
@@ -200,9 +209,11 @@ export type MarketOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   address?: Prisma.SortOrder
+  image?: Prisma.SortOrderInput | Prisma.SortOrder
   ownerId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  owner?: Prisma.UserOrderByWithRelationInput
   debtors?: Prisma.DebtorOrderByRelationAggregateInput
   products?: Prisma.ProductOrderByRelationAggregateInput
   transactions?: Prisma.TransactionOrderByRelationAggregateInput
@@ -216,9 +227,11 @@ export type MarketWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.MarketWhereInput | Prisma.MarketWhereInput[]
   name?: Prisma.StringFilter<"Market"> | string
   address?: Prisma.StringFilter<"Market"> | string
+  image?: Prisma.StringNullableFilter<"Market"> | string | null
   ownerId?: Prisma.StringFilter<"Market"> | string
   createdAt?: Prisma.DateTimeFilter<"Market"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Market"> | Date | string
+  owner?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   debtors?: Prisma.DebtorListRelationFilter
   products?: Prisma.ProductListRelationFilter
   transactions?: Prisma.TransactionListRelationFilter
@@ -229,6 +242,7 @@ export type MarketOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   address?: Prisma.SortOrder
+  image?: Prisma.SortOrderInput | Prisma.SortOrder
   ownerId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -244,6 +258,7 @@ export type MarketScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"Market"> | string
   name?: Prisma.StringWithAggregatesFilter<"Market"> | string
   address?: Prisma.StringWithAggregatesFilter<"Market"> | string
+  image?: Prisma.StringNullableWithAggregatesFilter<"Market"> | string | null
   ownerId?: Prisma.StringWithAggregatesFilter<"Market"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Market"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Market"> | Date | string
@@ -253,9 +268,10 @@ export type MarketCreateInput = {
   id?: string
   name: string
   address: string
-  ownerId: string
+  image?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  owner: Prisma.UserCreateNestedOneWithoutOwnedMarketsInput
   debtors?: Prisma.DebtorCreateNestedManyWithoutMarketInput
   products?: Prisma.ProductCreateNestedManyWithoutMarketInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutMarketInput
@@ -266,6 +282,7 @@ export type MarketUncheckedCreateInput = {
   id?: string
   name: string
   address: string
+  image?: string | null
   ownerId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -279,9 +296,10 @@ export type MarketUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
-  ownerId?: Prisma.StringFieldUpdateOperationsInput | string
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  owner?: Prisma.UserUpdateOneRequiredWithoutOwnedMarketsNestedInput
   debtors?: Prisma.DebtorUpdateManyWithoutMarketNestedInput
   products?: Prisma.ProductUpdateManyWithoutMarketNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutMarketNestedInput
@@ -292,6 +310,7 @@ export type MarketUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ownerId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -305,6 +324,7 @@ export type MarketCreateManyInput = {
   id?: string
   name: string
   address: string
+  image?: string | null
   ownerId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -314,7 +334,7 @@ export type MarketUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
-  ownerId?: Prisma.StringFieldUpdateOperationsInput | string
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -323,6 +343,7 @@ export type MarketUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ownerId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -333,10 +354,21 @@ export type MarketNullableScalarRelationFilter = {
   isNot?: Prisma.MarketWhereInput | null
 }
 
+export type MarketListRelationFilter = {
+  every?: Prisma.MarketWhereInput
+  some?: Prisma.MarketWhereInput
+  none?: Prisma.MarketWhereInput
+}
+
+export type MarketOrderByRelationAggregateInput = {
+  _count?: Prisma.SortOrder
+}
+
 export type MarketCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   address?: Prisma.SortOrder
+  image?: Prisma.SortOrder
   ownerId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -346,6 +378,7 @@ export type MarketMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   address?: Prisma.SortOrder
+  image?: Prisma.SortOrder
   ownerId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -355,6 +388,7 @@ export type MarketMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   address?: Prisma.SortOrder
+  image?: Prisma.SortOrder
   ownerId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -371,6 +405,20 @@ export type MarketCreateNestedOneWithoutUsersInput = {
   connect?: Prisma.MarketWhereUniqueInput
 }
 
+export type MarketCreateNestedManyWithoutOwnerInput = {
+  create?: Prisma.XOR<Prisma.MarketCreateWithoutOwnerInput, Prisma.MarketUncheckedCreateWithoutOwnerInput> | Prisma.MarketCreateWithoutOwnerInput[] | Prisma.MarketUncheckedCreateWithoutOwnerInput[]
+  connectOrCreate?: Prisma.MarketCreateOrConnectWithoutOwnerInput | Prisma.MarketCreateOrConnectWithoutOwnerInput[]
+  createMany?: Prisma.MarketCreateManyOwnerInputEnvelope
+  connect?: Prisma.MarketWhereUniqueInput | Prisma.MarketWhereUniqueInput[]
+}
+
+export type MarketUncheckedCreateNestedManyWithoutOwnerInput = {
+  create?: Prisma.XOR<Prisma.MarketCreateWithoutOwnerInput, Prisma.MarketUncheckedCreateWithoutOwnerInput> | Prisma.MarketCreateWithoutOwnerInput[] | Prisma.MarketUncheckedCreateWithoutOwnerInput[]
+  connectOrCreate?: Prisma.MarketCreateOrConnectWithoutOwnerInput | Prisma.MarketCreateOrConnectWithoutOwnerInput[]
+  createMany?: Prisma.MarketCreateManyOwnerInputEnvelope
+  connect?: Prisma.MarketWhereUniqueInput | Prisma.MarketWhereUniqueInput[]
+}
+
 export type MarketUpdateOneWithoutUsersNestedInput = {
   create?: Prisma.XOR<Prisma.MarketCreateWithoutUsersInput, Prisma.MarketUncheckedCreateWithoutUsersInput>
   connectOrCreate?: Prisma.MarketCreateOrConnectWithoutUsersInput
@@ -379,6 +427,34 @@ export type MarketUpdateOneWithoutUsersNestedInput = {
   delete?: Prisma.MarketWhereInput | boolean
   connect?: Prisma.MarketWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.MarketUpdateToOneWithWhereWithoutUsersInput, Prisma.MarketUpdateWithoutUsersInput>, Prisma.MarketUncheckedUpdateWithoutUsersInput>
+}
+
+export type MarketUpdateManyWithoutOwnerNestedInput = {
+  create?: Prisma.XOR<Prisma.MarketCreateWithoutOwnerInput, Prisma.MarketUncheckedCreateWithoutOwnerInput> | Prisma.MarketCreateWithoutOwnerInput[] | Prisma.MarketUncheckedCreateWithoutOwnerInput[]
+  connectOrCreate?: Prisma.MarketCreateOrConnectWithoutOwnerInput | Prisma.MarketCreateOrConnectWithoutOwnerInput[]
+  upsert?: Prisma.MarketUpsertWithWhereUniqueWithoutOwnerInput | Prisma.MarketUpsertWithWhereUniqueWithoutOwnerInput[]
+  createMany?: Prisma.MarketCreateManyOwnerInputEnvelope
+  set?: Prisma.MarketWhereUniqueInput | Prisma.MarketWhereUniqueInput[]
+  disconnect?: Prisma.MarketWhereUniqueInput | Prisma.MarketWhereUniqueInput[]
+  delete?: Prisma.MarketWhereUniqueInput | Prisma.MarketWhereUniqueInput[]
+  connect?: Prisma.MarketWhereUniqueInput | Prisma.MarketWhereUniqueInput[]
+  update?: Prisma.MarketUpdateWithWhereUniqueWithoutOwnerInput | Prisma.MarketUpdateWithWhereUniqueWithoutOwnerInput[]
+  updateMany?: Prisma.MarketUpdateManyWithWhereWithoutOwnerInput | Prisma.MarketUpdateManyWithWhereWithoutOwnerInput[]
+  deleteMany?: Prisma.MarketScalarWhereInput | Prisma.MarketScalarWhereInput[]
+}
+
+export type MarketUncheckedUpdateManyWithoutOwnerNestedInput = {
+  create?: Prisma.XOR<Prisma.MarketCreateWithoutOwnerInput, Prisma.MarketUncheckedCreateWithoutOwnerInput> | Prisma.MarketCreateWithoutOwnerInput[] | Prisma.MarketUncheckedCreateWithoutOwnerInput[]
+  connectOrCreate?: Prisma.MarketCreateOrConnectWithoutOwnerInput | Prisma.MarketCreateOrConnectWithoutOwnerInput[]
+  upsert?: Prisma.MarketUpsertWithWhereUniqueWithoutOwnerInput | Prisma.MarketUpsertWithWhereUniqueWithoutOwnerInput[]
+  createMany?: Prisma.MarketCreateManyOwnerInputEnvelope
+  set?: Prisma.MarketWhereUniqueInput | Prisma.MarketWhereUniqueInput[]
+  disconnect?: Prisma.MarketWhereUniqueInput | Prisma.MarketWhereUniqueInput[]
+  delete?: Prisma.MarketWhereUniqueInput | Prisma.MarketWhereUniqueInput[]
+  connect?: Prisma.MarketWhereUniqueInput | Prisma.MarketWhereUniqueInput[]
+  update?: Prisma.MarketUpdateWithWhereUniqueWithoutOwnerInput | Prisma.MarketUpdateWithWhereUniqueWithoutOwnerInput[]
+  updateMany?: Prisma.MarketUpdateManyWithWhereWithoutOwnerInput | Prisma.MarketUpdateManyWithWhereWithoutOwnerInput[]
+  deleteMany?: Prisma.MarketScalarWhereInput | Prisma.MarketScalarWhereInput[]
 }
 
 export type MarketCreateNestedOneWithoutProductsInput = {
@@ -427,9 +503,10 @@ export type MarketCreateWithoutUsersInput = {
   id?: string
   name: string
   address: string
-  ownerId: string
+  image?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  owner: Prisma.UserCreateNestedOneWithoutOwnedMarketsInput
   debtors?: Prisma.DebtorCreateNestedManyWithoutMarketInput
   products?: Prisma.ProductCreateNestedManyWithoutMarketInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutMarketInput
@@ -439,6 +516,7 @@ export type MarketUncheckedCreateWithoutUsersInput = {
   id?: string
   name: string
   address: string
+  image?: string | null
   ownerId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -450,6 +528,42 @@ export type MarketUncheckedCreateWithoutUsersInput = {
 export type MarketCreateOrConnectWithoutUsersInput = {
   where: Prisma.MarketWhereUniqueInput
   create: Prisma.XOR<Prisma.MarketCreateWithoutUsersInput, Prisma.MarketUncheckedCreateWithoutUsersInput>
+}
+
+export type MarketCreateWithoutOwnerInput = {
+  id?: string
+  name: string
+  address: string
+  image?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  debtors?: Prisma.DebtorCreateNestedManyWithoutMarketInput
+  products?: Prisma.ProductCreateNestedManyWithoutMarketInput
+  transactions?: Prisma.TransactionCreateNestedManyWithoutMarketInput
+  users?: Prisma.UserCreateNestedManyWithoutMarketInput
+}
+
+export type MarketUncheckedCreateWithoutOwnerInput = {
+  id?: string
+  name: string
+  address: string
+  image?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  debtors?: Prisma.DebtorUncheckedCreateNestedManyWithoutMarketInput
+  products?: Prisma.ProductUncheckedCreateNestedManyWithoutMarketInput
+  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutMarketInput
+  users?: Prisma.UserUncheckedCreateNestedManyWithoutMarketInput
+}
+
+export type MarketCreateOrConnectWithoutOwnerInput = {
+  where: Prisma.MarketWhereUniqueInput
+  create: Prisma.XOR<Prisma.MarketCreateWithoutOwnerInput, Prisma.MarketUncheckedCreateWithoutOwnerInput>
+}
+
+export type MarketCreateManyOwnerInputEnvelope = {
+  data: Prisma.MarketCreateManyOwnerInput | Prisma.MarketCreateManyOwnerInput[]
+  skipDuplicates?: boolean
 }
 
 export type MarketUpsertWithoutUsersInput = {
@@ -467,9 +581,10 @@ export type MarketUpdateWithoutUsersInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
-  ownerId?: Prisma.StringFieldUpdateOperationsInput | string
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  owner?: Prisma.UserUpdateOneRequiredWithoutOwnedMarketsNestedInput
   debtors?: Prisma.DebtorUpdateManyWithoutMarketNestedInput
   products?: Prisma.ProductUpdateManyWithoutMarketNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutMarketNestedInput
@@ -479,6 +594,7 @@ export type MarketUncheckedUpdateWithoutUsersInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ownerId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -487,13 +603,43 @@ export type MarketUncheckedUpdateWithoutUsersInput = {
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutMarketNestedInput
 }
 
+export type MarketUpsertWithWhereUniqueWithoutOwnerInput = {
+  where: Prisma.MarketWhereUniqueInput
+  update: Prisma.XOR<Prisma.MarketUpdateWithoutOwnerInput, Prisma.MarketUncheckedUpdateWithoutOwnerInput>
+  create: Prisma.XOR<Prisma.MarketCreateWithoutOwnerInput, Prisma.MarketUncheckedCreateWithoutOwnerInput>
+}
+
+export type MarketUpdateWithWhereUniqueWithoutOwnerInput = {
+  where: Prisma.MarketWhereUniqueInput
+  data: Prisma.XOR<Prisma.MarketUpdateWithoutOwnerInput, Prisma.MarketUncheckedUpdateWithoutOwnerInput>
+}
+
+export type MarketUpdateManyWithWhereWithoutOwnerInput = {
+  where: Prisma.MarketScalarWhereInput
+  data: Prisma.XOR<Prisma.MarketUpdateManyMutationInput, Prisma.MarketUncheckedUpdateManyWithoutOwnerInput>
+}
+
+export type MarketScalarWhereInput = {
+  AND?: Prisma.MarketScalarWhereInput | Prisma.MarketScalarWhereInput[]
+  OR?: Prisma.MarketScalarWhereInput[]
+  NOT?: Prisma.MarketScalarWhereInput | Prisma.MarketScalarWhereInput[]
+  id?: Prisma.StringFilter<"Market"> | string
+  name?: Prisma.StringFilter<"Market"> | string
+  address?: Prisma.StringFilter<"Market"> | string
+  image?: Prisma.StringNullableFilter<"Market"> | string | null
+  ownerId?: Prisma.StringFilter<"Market"> | string
+  createdAt?: Prisma.DateTimeFilter<"Market"> | Date | string
+  updatedAt?: Prisma.DateTimeFilter<"Market"> | Date | string
+}
+
 export type MarketCreateWithoutProductsInput = {
   id?: string
   name: string
   address: string
-  ownerId: string
+  image?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  owner: Prisma.UserCreateNestedOneWithoutOwnedMarketsInput
   debtors?: Prisma.DebtorCreateNestedManyWithoutMarketInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutMarketInput
   users?: Prisma.UserCreateNestedManyWithoutMarketInput
@@ -503,6 +649,7 @@ export type MarketUncheckedCreateWithoutProductsInput = {
   id?: string
   name: string
   address: string
+  image?: string | null
   ownerId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -531,9 +678,10 @@ export type MarketUpdateWithoutProductsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
-  ownerId?: Prisma.StringFieldUpdateOperationsInput | string
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  owner?: Prisma.UserUpdateOneRequiredWithoutOwnedMarketsNestedInput
   debtors?: Prisma.DebtorUpdateManyWithoutMarketNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutMarketNestedInput
   users?: Prisma.UserUpdateManyWithoutMarketNestedInput
@@ -543,6 +691,7 @@ export type MarketUncheckedUpdateWithoutProductsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ownerId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -555,9 +704,10 @@ export type MarketCreateWithoutDebtorsInput = {
   id?: string
   name: string
   address: string
-  ownerId: string
+  image?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  owner: Prisma.UserCreateNestedOneWithoutOwnedMarketsInput
   products?: Prisma.ProductCreateNestedManyWithoutMarketInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutMarketInput
   users?: Prisma.UserCreateNestedManyWithoutMarketInput
@@ -567,6 +717,7 @@ export type MarketUncheckedCreateWithoutDebtorsInput = {
   id?: string
   name: string
   address: string
+  image?: string | null
   ownerId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -595,9 +746,10 @@ export type MarketUpdateWithoutDebtorsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
-  ownerId?: Prisma.StringFieldUpdateOperationsInput | string
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  owner?: Prisma.UserUpdateOneRequiredWithoutOwnedMarketsNestedInput
   products?: Prisma.ProductUpdateManyWithoutMarketNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutMarketNestedInput
   users?: Prisma.UserUpdateManyWithoutMarketNestedInput
@@ -607,6 +759,7 @@ export type MarketUncheckedUpdateWithoutDebtorsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ownerId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -619,9 +772,10 @@ export type MarketCreateWithoutTransactionsInput = {
   id?: string
   name: string
   address: string
-  ownerId: string
+  image?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  owner: Prisma.UserCreateNestedOneWithoutOwnedMarketsInput
   debtors?: Prisma.DebtorCreateNestedManyWithoutMarketInput
   products?: Prisma.ProductCreateNestedManyWithoutMarketInput
   users?: Prisma.UserCreateNestedManyWithoutMarketInput
@@ -631,6 +785,7 @@ export type MarketUncheckedCreateWithoutTransactionsInput = {
   id?: string
   name: string
   address: string
+  image?: string | null
   ownerId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -659,9 +814,10 @@ export type MarketUpdateWithoutTransactionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
-  ownerId?: Prisma.StringFieldUpdateOperationsInput | string
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  owner?: Prisma.UserUpdateOneRequiredWithoutOwnedMarketsNestedInput
   debtors?: Prisma.DebtorUpdateManyWithoutMarketNestedInput
   products?: Prisma.ProductUpdateManyWithoutMarketNestedInput
   users?: Prisma.UserUpdateManyWithoutMarketNestedInput
@@ -671,12 +827,57 @@ export type MarketUncheckedUpdateWithoutTransactionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ownerId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   debtors?: Prisma.DebtorUncheckedUpdateManyWithoutMarketNestedInput
   products?: Prisma.ProductUncheckedUpdateManyWithoutMarketNestedInput
   users?: Prisma.UserUncheckedUpdateManyWithoutMarketNestedInput
+}
+
+export type MarketCreateManyOwnerInput = {
+  id?: string
+  name: string
+  address: string
+  image?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type MarketUpdateWithoutOwnerInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  address?: Prisma.StringFieldUpdateOperationsInput | string
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  debtors?: Prisma.DebtorUpdateManyWithoutMarketNestedInput
+  products?: Prisma.ProductUpdateManyWithoutMarketNestedInput
+  transactions?: Prisma.TransactionUpdateManyWithoutMarketNestedInput
+  users?: Prisma.UserUpdateManyWithoutMarketNestedInput
+}
+
+export type MarketUncheckedUpdateWithoutOwnerInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  address?: Prisma.StringFieldUpdateOperationsInput | string
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  debtors?: Prisma.DebtorUncheckedUpdateManyWithoutMarketNestedInput
+  products?: Prisma.ProductUncheckedUpdateManyWithoutMarketNestedInput
+  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutMarketNestedInput
+  users?: Prisma.UserUncheckedUpdateManyWithoutMarketNestedInput
+}
+
+export type MarketUncheckedUpdateManyWithoutOwnerInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  address?: Prisma.StringFieldUpdateOperationsInput | string
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 
@@ -741,9 +942,11 @@ export type MarketSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   id?: boolean
   name?: boolean
   address?: boolean
+  image?: boolean
   ownerId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  owner?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   debtors?: boolean | Prisma.Market$debtorsArgs<ExtArgs>
   products?: boolean | Prisma.Market$productsArgs<ExtArgs>
   transactions?: boolean | Prisma.Market$transactionsArgs<ExtArgs>
@@ -755,43 +958,54 @@ export type MarketSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extens
   id?: boolean
   name?: boolean
   address?: boolean
+  image?: boolean
   ownerId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  owner?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["market"]>
 
 export type MarketSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   name?: boolean
   address?: boolean
+  image?: boolean
   ownerId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  owner?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["market"]>
 
 export type MarketSelectScalar = {
   id?: boolean
   name?: boolean
   address?: boolean
+  image?: boolean
   ownerId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type MarketOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "address" | "ownerId" | "createdAt" | "updatedAt", ExtArgs["result"]["market"]>
+export type MarketOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "address" | "image" | "ownerId" | "createdAt" | "updatedAt", ExtArgs["result"]["market"]>
 export type MarketInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  owner?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   debtors?: boolean | Prisma.Market$debtorsArgs<ExtArgs>
   products?: boolean | Prisma.Market$productsArgs<ExtArgs>
   transactions?: boolean | Prisma.Market$transactionsArgs<ExtArgs>
   users?: boolean | Prisma.Market$usersArgs<ExtArgs>
   _count?: boolean | Prisma.MarketCountOutputTypeDefaultArgs<ExtArgs>
 }
-export type MarketIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
-export type MarketIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
+export type MarketIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  owner?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+}
+export type MarketIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  owner?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+}
 
 export type $MarketPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "Market"
   objects: {
+    owner: Prisma.$UserPayload<ExtArgs>
     debtors: Prisma.$DebtorPayload<ExtArgs>[]
     products: Prisma.$ProductPayload<ExtArgs>[]
     transactions: Prisma.$TransactionPayload<ExtArgs>[]
@@ -801,6 +1015,7 @@ export type $MarketPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     id: string
     name: string
     address: string
+    image: string | null
     ownerId: string
     createdAt: Date
     updatedAt: Date
@@ -1198,6 +1413,7 @@ readonly fields: MarketFieldRefs;
  */
 export interface Prisma__MarketClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
+  owner<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   debtors<T extends Prisma.Market$debtorsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Market$debtorsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DebtorPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   products<T extends Prisma.Market$productsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Market$productsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProductPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   transactions<T extends Prisma.Market$transactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Market$transactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -1234,6 +1450,7 @@ export interface MarketFieldRefs {
   readonly id: Prisma.FieldRef<"Market", 'String'>
   readonly name: Prisma.FieldRef<"Market", 'String'>
   readonly address: Prisma.FieldRef<"Market", 'String'>
+  readonly image: Prisma.FieldRef<"Market", 'String'>
   readonly ownerId: Prisma.FieldRef<"Market", 'String'>
   readonly createdAt: Prisma.FieldRef<"Market", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Market", 'DateTime'>
@@ -1491,6 +1708,10 @@ export type MarketCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensio
    */
   data: Prisma.MarketCreateManyInput | Prisma.MarketCreateManyInput[]
   skipDuplicates?: boolean
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.MarketIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1561,6 +1782,10 @@ export type MarketUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensio
    * Limit how many Markets to update.
    */
   limit?: number
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.MarketIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**

@@ -997,6 +997,7 @@ export const MarketScalarFieldEnum = {
   id: 'id',
   name: 'name',
   address: 'address',
+  image: 'image',
   ownerId: 'ownerId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -1008,8 +1009,10 @@ export type MarketScalarFieldEnum = (typeof MarketScalarFieldEnum)[keyof typeof 
 export const ProductScalarFieldEnum = {
   id: 'id',
   name: 'name',
+  description: 'description',
   price: 'price',
   quantity: 'quantity',
+  image: 'image',
   marketId: 'marketId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
