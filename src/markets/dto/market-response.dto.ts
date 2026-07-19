@@ -1,69 +1,72 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 class MarketOwnerDto {
-  @ApiProperty()
+  @ApiProperty({ description: 'Owner ID' })
   id: string
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Owner name' })
   name: string
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Owner email' })
   email: string
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Owner role' })
   role?: string
 }
 
 class MarketUserDto {
-  @ApiProperty()
+  @ApiProperty({ description: 'User ID' })
   id: string
 
-  @ApiProperty()
+  @ApiProperty({ description: 'User name' })
   name: string
 
-  @ApiProperty()
+  @ApiProperty({ description: 'User email' })
   email: string
 
-  @ApiProperty()
+  @ApiProperty({ description: 'User role' })
   role: string
 }
 
 class MarketCountDto {
-  @ApiProperty()
+  @ApiProperty({ description: 'Total products count' })
   products: number
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Total debtors count' })
   debtors: number
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Total transactions count' })
   transactions: number
 }
 
 export class MarketResponseDto {
-  @ApiProperty()
+  @ApiProperty({ description: 'Unique identifier' })
   id: string
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Market name' })
   name: string
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Market address' })
   address: string
 
-  @ApiProperty()
+  @ApiPropertyOptional({ description: 'Market image URL' })
+  image?: string
+
+  @ApiProperty({ description: 'Owner user ID' })
   ownerId: string
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Creation timestamp' })
   createdAt: string
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Last update timestamp' })
   updatedAt: string
 
-  @ApiPropertyOptional({ type: [MarketUserDto] })
+  @ApiPropertyOptional({ type: [MarketUserDto], description: 'Market users' })
   users?: MarketUserDto[]
 
-  @ApiPropertyOptional({ type: MarketCountDto })
+  @ApiPropertyOptional({ type: MarketCountDto, description: 'Related entities count' })
   count?: MarketCountDto
 
-  @ApiPropertyOptional({ type: MarketOwnerDto })
+  @ApiPropertyOptional({ type: MarketOwnerDto, description: 'Market owner details' })
   owner?: MarketOwnerDto
 }
