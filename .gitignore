@@ -3,3 +3,4 @@ dist/
 .env
 src/generated/
 *.tsbuildinfo
+package-lock.json
