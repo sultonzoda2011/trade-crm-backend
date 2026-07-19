@@ -5,3 +5,4 @@ src/generated/
 *.tsbuildinfo
 package-lock.json
 prisma/migrations/
+prisma/generated/
