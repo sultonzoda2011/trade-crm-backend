@@ -1,7 +1,6 @@
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  moduleFormat = "cjs"
+  provider = "prisma-client"
+  output   = "./generated"
 }
 
 datasource db {
@@ -9,86 +8,97 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  password  String
-  role      Role
-  marketId  String?
-  market    Market?  @relation(fields: [marketId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String         @id @default(uuid())
+  name           String
+  email          String         @unique
+  password       String
+  role           Role
+  marketId       String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  transactions   Transaction[]
+  market         Market?        @relation(fields: [marketId], references: [id])
+  ownedMarkets   Market[]       @relation("MarketOwner")
+  refreshTokens  RefreshToken[]
+}
 
-  transactions Transaction[]
+model RefreshToken {
+  id        String    @id @default(uuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  @@index([userId])
+  @@index([token])
 }
 
 model Market {
-  id        String   @id @default(uuid())
-  name      String
-  address   String
-  ownerId   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  users        User[]
-  products     Product[]
+  id           String        @id @default(uuid())
+  name         String
+  address      String
+  ownerId      String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  owner        User          @relation("MarketOwner", fields: [ownerId], references: [id])
   debtors      Debtor[]
+  products     Product[]
   transactions Transaction[]
+  users        User[]
 }
 
 model Product {
-  id        String   @id @default(uuid())
-  name      String
-  price     Float
-  quantity  Int
-  marketId  String
-  market    Market   @relation(fields: [marketId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id               String            @id @default(uuid())
+  name             String
+  price            Float
+  quantity         Int
+  marketId         String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  market           Market            @relation(fields: [marketId], references: [id])
   transactionItems TransactionItem[]
 }
 
 model Debtor {
-  id        String   @id @default(uuid())
-  name      String
-  phone     String
-  marketId  String
-  market    Market   @relation(fields: [marketId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id           String        @id @default(uuid())
+  name         String
+  phone        String
+  marketId     String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  market       Market        @relation(fields: [marketId], references: [id])
   transactions Transaction[]
 }
 
 model Transaction {
   id          String            @id @default(uuid())
   marketId    String
-  market      Market            @relation(fields: [marketId], references: [id])
   createdById String
-  createdBy   User              @relation(fields: [createdById], references: [id])
   debtorId    String?
-  debtor      Debtor?           @relation(fields: [debtorId], references: [id])
   type        TransactionType
   paymentType PaymentType
   totalAmount Float
   status      TransactionStatus
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
-
-  items TransactionItem[]
+  createdBy   User              @relation(fields: [createdById], references: [id])
+  debtor      Debtor?           @relation(fields: [debtorId], references: [id])
+  market      Market            @relation(fields: [marketId], references: [id])
+  items       TransactionItem[]
 }
 
 model TransactionItem {
   id            String      @id @default(uuid())
   transactionId String
-  transaction   Transaction @relation(fields: [transactionId], references: [id])
   productId     String
-  product       Product     @relation(fields: [productId], references: [id])
   productName   String
   quantity      Int
   price         Float
   totalPrice    Float
+  product       Product     @relation(fields: [productId], references: [id])
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
 }
 
 enum Role {
