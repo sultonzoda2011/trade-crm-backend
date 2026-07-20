@@ -17,6 +17,7 @@ model User {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   transactions   Transaction[]
+  payments       Payment[]
   market         Market?        @relation(fields: [marketId], references: [id])
   ownedMarkets   Market[]       @relation("MarketOwner")
   refreshTokens  RefreshToken[]
@@ -76,20 +77,22 @@ model Debtor {
 }
 
 model Transaction {
-  id          String            @id @default(uuid())
-  marketId    String
-  createdById String
-  debtorId    String?
-  type        TransactionType
-  paymentType PaymentType
-  totalAmount Float
-  status      TransactionStatus
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  createdBy   User              @relation(fields: [createdById], references: [id])
-  debtor      Debtor?           @relation(fields: [debtorId], references: [id])
-  market      Market            @relation(fields: [marketId], references: [id])
-  items       TransactionItem[]
+  id              String            @id @default(uuid())
+  marketId        String
+  createdById     String
+  debtorId        String?
+  type            TransactionType
+  paymentType     PaymentType
+  totalAmount     Float
+  remainingAmount Float             @default(0)
+  status          TransactionStatus
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  createdBy       User              @relation(fields: [createdById], references: [id])
+  debtor          Debtor?           @relation(fields: [debtorId], references: [id])
+  market          Market            @relation(fields: [marketId], references: [id])
+  items           TransactionItem[]
+  payments        Payment[]
 }
 
 model TransactionItem {
@@ -102,6 +105,19 @@ model TransactionItem {
   totalPrice    Float
   product       Product     @relation(fields: [productId], references: [id])
   transaction   Transaction @relation(fields: [transactionId], references: [id])
+}
+
+model Payment {
+  id            String      @id @default(uuid())
+  transactionId String
+  amount        Float
+  note          String?
+  createdById   String
+  createdAt     DateTime    @default(now())
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  createdBy     User        @relation(fields: [createdById], references: [id])
+
+  @@index([transactionId])
 }
 
 enum Role {
