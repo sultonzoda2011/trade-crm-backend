@@ -62,8 +62,8 @@ export class ProductsController {
   @ApiOperation({ summary: 'Get a product by ID', description: 'Returns a single product with full details.' })
   @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Product ID' })
   @ApiOkResponse({ type: ProductResponseDto, description: 'The found product' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.productsService.findOne(id)
+  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+    return this.productsService.findOne(id, user.marketId)
   }
 
   @Patch(':id')

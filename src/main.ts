@@ -43,7 +43,7 @@ async function bootstrap() {
 		.setDescription('CRM для управления маркетами')
 		.setVersion('1.0')
 		.setContact('TradeCRM Team', '', 'support@tradecrm.com')
-		.addServer('http://localhost:3000', 'Development')
+		.addServer('http://localhost:4000', 'Development')
 		.addBearerAuth(
 			{ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
 			'bearer'

@@ -35,8 +35,8 @@ export class DebtorsController {
 
   @Get(':id')
   @ApiOkResponse({ type: DebtorResponseDto })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.debtorsService.findOne(id)
+  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+    return this.debtorsService.findOne(id, user.marketId)
   }
 
   @Patch(':id')
