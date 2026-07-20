@@ -46,7 +46,7 @@ async function bootstrap() {
 		.addServer('http://localhost:3000', 'Development')
 		.addBearerAuth(
 			{ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-			'access-token'
+			'bearer'
 		)
 		.build()
 
