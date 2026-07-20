@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TransactionStatus } from '../enums'
 import { JwtPayload } from '../interfaces'
 import { PaginatedResult } from '../common/dto/pagination.dto'
 import { CreateTransactionDto } from './dto/create-transaction.dto'
+import { CreatePaymentDto } from './dto/create-payment.dto'
 import { QueryTransactionDto } from './dto/query-transaction.dto'
 import { UpdateTransactionDto } from './dto/update-transaction.dto'
 
@@ -16,6 +17,12 @@ const transactionInclude = {
   createdBy: { select: { id: true, name: true, email: true } },
   debtor: { select: { id: true, name: true, phone: true } },
   market: { select: { id: true, name: true, address: true } },
+  payments: {
+    include: {
+      createdBy: { select: { id: true, name: true, email: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  },
 } as const
 
 @Injectable()
@@ -35,6 +42,8 @@ export class TransactionsService {
 
     const itemsTotal = dto.items.reduce((sum, item) => sum + item.quantity * item.price, 0)
 
+    const isDebt = dto.type === 'DEBT'
+
     return this.prisma.transaction.create({
       data: {
         marketId,
@@ -43,7 +52,8 @@ export class TransactionsService {
         type: dto.type,
         paymentType: dto.paymentType,
         totalAmount: itemsTotal,
-        status: TransactionStatus.ACTIVE,
+        remainingAmount: isDebt ? itemsTotal : 0,
+        status: isDebt ? TransactionStatus.ACTIVE : TransactionStatus.PAID,
         items: {
           create: dto.items.map((item) => ({
             productId: item.productId,
@@ -121,5 +131,48 @@ export class TransactionsService {
   async remove(id: string, userMarketId?: string) {
     await this.findOne(id, userMarketId)
     await this.prisma.transaction.delete({ where: { id } })
+  }
+
+  async pay(id: string, dto: CreatePaymentDto, user: JwtPayload) {
+    const marketId = user.marketId
+    if (!marketId) throw new UnauthorizedException('User is not assigned to a market')
+
+    const transaction = await this.findOne(id, marketId)
+
+    if (transaction.remainingAmount <= 0) {
+      throw new BadRequestException('Transaction is already fully paid')
+    }
+
+    if (dto.amount > transaction.remainingAmount) {
+      throw new BadRequestException(
+        `Payment amount (${dto.amount}) exceeds remaining debt (${transaction.remainingAmount})`,
+      )
+    }
+
+    const newRemaining = transaction.remainingAmount - dto.amount
+    const newStatus = newRemaining <= 0
+      ? TransactionStatus.PAID
+      : TransactionStatus.PARTIAL
+
+    const [updated] = await this.prisma.$transaction([
+      this.prisma.transaction.update({
+        where: { id },
+        data: {
+          remainingAmount: newRemaining,
+          status: newStatus,
+        },
+        include: transactionInclude,
+      }),
+      this.prisma.payment.create({
+        data: {
+          transactionId: id,
+          amount: dto.amount,
+          note: dto.note,
+          createdById: user.sub,
+        },
+      }),
+    ])
+
+    return updated
   }
 }
