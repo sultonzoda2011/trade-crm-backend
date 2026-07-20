@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { PaymentResponseDto } from './payment-response.dto'
 
 class TransactionItemProductDto {
   @ApiProperty()
@@ -90,6 +91,9 @@ export class TransactionResponseDto {
   totalAmount: number
 
   @ApiProperty()
+  remainingAmount: number
+
+  @ApiProperty()
   status: string
 
   @ApiProperty()
@@ -109,4 +113,7 @@ export class TransactionResponseDto {
 
   @ApiPropertyOptional({ type: TransactionMarketDto })
   market?: TransactionMarketDto
+
+  @ApiPropertyOptional({ type: [PaymentResponseDto] })
+  payments?: PaymentResponseDto[]
 }
