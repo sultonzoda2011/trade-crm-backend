@@ -74,3 +74,8 @@ export type Transaction = Prisma.TransactionModel
  * 
  */
 export type TransactionItem = Prisma.TransactionItemModel
+/**
+ * Model Payment
+ * 
+ */
+export type Payment = Prisma.PaymentModel

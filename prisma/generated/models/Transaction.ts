@@ -28,10 +28,12 @@ export type AggregateTransaction = {
 
 export type TransactionAvgAggregateOutputType = {
   totalAmount: number | null
+  remainingAmount: number | null
 }
 
 export type TransactionSumAggregateOutputType = {
   totalAmount: number | null
+  remainingAmount: number | null
 }
 
 export type TransactionMinAggregateOutputType = {
@@ -42,6 +44,7 @@ export type TransactionMinAggregateOutputType = {
   type: $Enums.TransactionType | null
   paymentType: $Enums.PaymentType | null
   totalAmount: number | null
+  remainingAmount: number | null
   status: $Enums.TransactionStatus | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -55,6 +58,7 @@ export type TransactionMaxAggregateOutputType = {
   type: $Enums.TransactionType | null
   paymentType: $Enums.PaymentType | null
   totalAmount: number | null
+  remainingAmount: number | null
   status: $Enums.TransactionStatus | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -68,6 +72,7 @@ export type TransactionCountAggregateOutputType = {
   type: number
   paymentType: number
   totalAmount: number
+  remainingAmount: number
   status: number
   createdAt: number
   updatedAt: number
@@ -77,10 +82,12 @@ export type TransactionCountAggregateOutputType = {
 
 export type TransactionAvgAggregateInputType = {
   totalAmount?: true
+  remainingAmount?: true
 }
 
 export type TransactionSumAggregateInputType = {
   totalAmount?: true
+  remainingAmount?: true
 }
 
 export type TransactionMinAggregateInputType = {
@@ -91,6 +98,7 @@ export type TransactionMinAggregateInputType = {
   type?: true
   paymentType?: true
   totalAmount?: true
+  remainingAmount?: true
   status?: true
   createdAt?: true
   updatedAt?: true
@@ -104,6 +112,7 @@ export type TransactionMaxAggregateInputType = {
   type?: true
   paymentType?: true
   totalAmount?: true
+  remainingAmount?: true
   status?: true
   createdAt?: true
   updatedAt?: true
@@ -117,6 +126,7 @@ export type TransactionCountAggregateInputType = {
   type?: true
   paymentType?: true
   totalAmount?: true
+  remainingAmount?: true
   status?: true
   createdAt?: true
   updatedAt?: true
@@ -217,6 +227,7 @@ export type TransactionGroupByOutputType = {
   type: $Enums.TransactionType
   paymentType: $Enums.PaymentType
   totalAmount: number
+  remainingAmount: number
   status: $Enums.TransactionStatus
   createdAt: Date
   updatedAt: Date
@@ -253,6 +264,7 @@ export type TransactionWhereInput = {
   type?: Prisma.EnumTransactionTypeFilter<"Transaction"> | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeFilter<"Transaction"> | $Enums.PaymentType
   totalAmount?: Prisma.FloatFilter<"Transaction"> | number
+  remainingAmount?: Prisma.FloatFilter<"Transaction"> | number
   status?: Prisma.EnumTransactionStatusFilter<"Transaction"> | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeFilter<"Transaction"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Transaction"> | Date | string
@@ -260,6 +272,7 @@ export type TransactionWhereInput = {
   debtor?: Prisma.XOR<Prisma.DebtorNullableScalarRelationFilter, Prisma.DebtorWhereInput> | null
   market?: Prisma.XOR<Prisma.MarketScalarRelationFilter, Prisma.MarketWhereInput>
   items?: Prisma.TransactionItemListRelationFilter
+  payments?: Prisma.PaymentListRelationFilter
 }
 
 export type TransactionOrderByWithRelationInput = {
@@ -270,6 +283,7 @@ export type TransactionOrderByWithRelationInput = {
   type?: Prisma.SortOrder
   paymentType?: Prisma.SortOrder
   totalAmount?: Prisma.SortOrder
+  remainingAmount?: Prisma.SortOrder
   status?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -277,6 +291,7 @@ export type TransactionOrderByWithRelationInput = {
   debtor?: Prisma.DebtorOrderByWithRelationInput
   market?: Prisma.MarketOrderByWithRelationInput
   items?: Prisma.TransactionItemOrderByRelationAggregateInput
+  payments?: Prisma.PaymentOrderByRelationAggregateInput
 }
 
 export type TransactionWhereUniqueInput = Prisma.AtLeast<{
@@ -290,6 +305,7 @@ export type TransactionWhereUniqueInput = Prisma.AtLeast<{
   type?: Prisma.EnumTransactionTypeFilter<"Transaction"> | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeFilter<"Transaction"> | $Enums.PaymentType
   totalAmount?: Prisma.FloatFilter<"Transaction"> | number
+  remainingAmount?: Prisma.FloatFilter<"Transaction"> | number
   status?: Prisma.EnumTransactionStatusFilter<"Transaction"> | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeFilter<"Transaction"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Transaction"> | Date | string
@@ -297,6 +313,7 @@ export type TransactionWhereUniqueInput = Prisma.AtLeast<{
   debtor?: Prisma.XOR<Prisma.DebtorNullableScalarRelationFilter, Prisma.DebtorWhereInput> | null
   market?: Prisma.XOR<Prisma.MarketScalarRelationFilter, Prisma.MarketWhereInput>
   items?: Prisma.TransactionItemListRelationFilter
+  payments?: Prisma.PaymentListRelationFilter
 }, "id">
 
 export type TransactionOrderByWithAggregationInput = {
@@ -307,6 +324,7 @@ export type TransactionOrderByWithAggregationInput = {
   type?: Prisma.SortOrder
   paymentType?: Prisma.SortOrder
   totalAmount?: Prisma.SortOrder
+  remainingAmount?: Prisma.SortOrder
   status?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -328,6 +346,7 @@ export type TransactionScalarWhereWithAggregatesInput = {
   type?: Prisma.EnumTransactionTypeWithAggregatesFilter<"Transaction"> | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeWithAggregatesFilter<"Transaction"> | $Enums.PaymentType
   totalAmount?: Prisma.FloatWithAggregatesFilter<"Transaction"> | number
+  remainingAmount?: Prisma.FloatWithAggregatesFilter<"Transaction"> | number
   status?: Prisma.EnumTransactionStatusWithAggregatesFilter<"Transaction"> | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Transaction"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Transaction"> | Date | string
@@ -338,6 +357,7 @@ export type TransactionCreateInput = {
   type: $Enums.TransactionType
   paymentType: $Enums.PaymentType
   totalAmount: number
+  remainingAmount?: number
   status: $Enums.TransactionStatus
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -345,6 +365,7 @@ export type TransactionCreateInput = {
   debtor?: Prisma.DebtorCreateNestedOneWithoutTransactionsInput
   market: Prisma.MarketCreateNestedOneWithoutTransactionsInput
   items?: Prisma.TransactionItemCreateNestedManyWithoutTransactionInput
+  payments?: Prisma.PaymentCreateNestedManyWithoutTransactionInput
 }
 
 export type TransactionUncheckedCreateInput = {
@@ -355,10 +376,12 @@ export type TransactionUncheckedCreateInput = {
   type: $Enums.TransactionType
   paymentType: $Enums.PaymentType
   totalAmount: number
+  remainingAmount?: number
   status: $Enums.TransactionStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   items?: Prisma.TransactionItemUncheckedCreateNestedManyWithoutTransactionInput
+  payments?: Prisma.PaymentUncheckedCreateNestedManyWithoutTransactionInput
 }
 
 export type TransactionUpdateInput = {
@@ -366,6 +389,7 @@ export type TransactionUpdateInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   totalAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  remainingAmount?: Prisma.FloatFieldUpdateOperationsInput | number
   status?: Prisma.EnumTransactionStatusFieldUpdateOperationsInput | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -373,6 +397,7 @@ export type TransactionUpdateInput = {
   debtor?: Prisma.DebtorUpdateOneWithoutTransactionsNestedInput
   market?: Prisma.MarketUpdateOneRequiredWithoutTransactionsNestedInput
   items?: Prisma.TransactionItemUpdateManyWithoutTransactionNestedInput
+  payments?: Prisma.PaymentUpdateManyWithoutTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateInput = {
@@ -383,10 +408,12 @@ export type TransactionUncheckedUpdateInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   totalAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  remainingAmount?: Prisma.FloatFieldUpdateOperationsInput | number
   status?: Prisma.EnumTransactionStatusFieldUpdateOperationsInput | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   items?: Prisma.TransactionItemUncheckedUpdateManyWithoutTransactionNestedInput
+  payments?: Prisma.PaymentUncheckedUpdateManyWithoutTransactionNestedInput
 }
 
 export type TransactionCreateManyInput = {
@@ -397,6 +424,7 @@ export type TransactionCreateManyInput = {
   type: $Enums.TransactionType
   paymentType: $Enums.PaymentType
   totalAmount: number
+  remainingAmount?: number
   status: $Enums.TransactionStatus
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -407,6 +435,7 @@ export type TransactionUpdateManyMutationInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   totalAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  remainingAmount?: Prisma.FloatFieldUpdateOperationsInput | number
   status?: Prisma.EnumTransactionStatusFieldUpdateOperationsInput | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -420,6 +449,7 @@ export type TransactionUncheckedUpdateManyInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   totalAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  remainingAmount?: Prisma.FloatFieldUpdateOperationsInput | number
   status?: Prisma.EnumTransactionStatusFieldUpdateOperationsInput | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -443,6 +473,7 @@ export type TransactionCountOrderByAggregateInput = {
   type?: Prisma.SortOrder
   paymentType?: Prisma.SortOrder
   totalAmount?: Prisma.SortOrder
+  remainingAmount?: Prisma.SortOrder
   status?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -450,6 +481,7 @@ export type TransactionCountOrderByAggregateInput = {
 
 export type TransactionAvgOrderByAggregateInput = {
   totalAmount?: Prisma.SortOrder
+  remainingAmount?: Prisma.SortOrder
 }
 
 export type TransactionMaxOrderByAggregateInput = {
@@ -460,6 +492,7 @@ export type TransactionMaxOrderByAggregateInput = {
   type?: Prisma.SortOrder
   paymentType?: Prisma.SortOrder
   totalAmount?: Prisma.SortOrder
+  remainingAmount?: Prisma.SortOrder
   status?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -473,6 +506,7 @@ export type TransactionMinOrderByAggregateInput = {
   type?: Prisma.SortOrder
   paymentType?: Prisma.SortOrder
   totalAmount?: Prisma.SortOrder
+  remainingAmount?: Prisma.SortOrder
   status?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -480,6 +514,7 @@ export type TransactionMinOrderByAggregateInput = {
 
 export type TransactionSumOrderByAggregateInput = {
   totalAmount?: Prisma.SortOrder
+  remainingAmount?: Prisma.SortOrder
 }
 
 export type TransactionScalarRelationFilter = {
@@ -639,17 +674,33 @@ export type TransactionUpdateOneRequiredWithoutItemsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.TransactionUpdateToOneWithWhereWithoutItemsInput, Prisma.TransactionUpdateWithoutItemsInput>, Prisma.TransactionUncheckedUpdateWithoutItemsInput>
 }
 
+export type TransactionCreateNestedOneWithoutPaymentsInput = {
+  create?: Prisma.XOR<Prisma.TransactionCreateWithoutPaymentsInput, Prisma.TransactionUncheckedCreateWithoutPaymentsInput>
+  connectOrCreate?: Prisma.TransactionCreateOrConnectWithoutPaymentsInput
+  connect?: Prisma.TransactionWhereUniqueInput
+}
+
+export type TransactionUpdateOneRequiredWithoutPaymentsNestedInput = {
+  create?: Prisma.XOR<Prisma.TransactionCreateWithoutPaymentsInput, Prisma.TransactionUncheckedCreateWithoutPaymentsInput>
+  connectOrCreate?: Prisma.TransactionCreateOrConnectWithoutPaymentsInput
+  upsert?: Prisma.TransactionUpsertWithoutPaymentsInput
+  connect?: Prisma.TransactionWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TransactionUpdateToOneWithWhereWithoutPaymentsInput, Prisma.TransactionUpdateWithoutPaymentsInput>, Prisma.TransactionUncheckedUpdateWithoutPaymentsInput>
+}
+
 export type TransactionCreateWithoutCreatedByInput = {
   id?: string
   type: $Enums.TransactionType
   paymentType: $Enums.PaymentType
   totalAmount: number
+  remainingAmount?: number
   status: $Enums.TransactionStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   debtor?: Prisma.DebtorCreateNestedOneWithoutTransactionsInput
   market: Prisma.MarketCreateNestedOneWithoutTransactionsInput
   items?: Prisma.TransactionItemCreateNestedManyWithoutTransactionInput
+  payments?: Prisma.PaymentCreateNestedManyWithoutTransactionInput
 }
 
 export type TransactionUncheckedCreateWithoutCreatedByInput = {
@@ -659,10 +710,12 @@ export type TransactionUncheckedCreateWithoutCreatedByInput = {
   type: $Enums.TransactionType
   paymentType: $Enums.PaymentType
   totalAmount: number
+  remainingAmount?: number
   status: $Enums.TransactionStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   items?: Prisma.TransactionItemUncheckedCreateNestedManyWithoutTransactionInput
+  payments?: Prisma.PaymentUncheckedCreateNestedManyWithoutTransactionInput
 }
 
 export type TransactionCreateOrConnectWithoutCreatedByInput = {
@@ -702,6 +755,7 @@ export type TransactionScalarWhereInput = {
   type?: Prisma.EnumTransactionTypeFilter<"Transaction"> | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeFilter<"Transaction"> | $Enums.PaymentType
   totalAmount?: Prisma.FloatFilter<"Transaction"> | number
+  remainingAmount?: Prisma.FloatFilter<"Transaction"> | number
   status?: Prisma.EnumTransactionStatusFilter<"Transaction"> | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeFilter<"Transaction"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Transaction"> | Date | string
@@ -712,12 +766,14 @@ export type TransactionCreateWithoutMarketInput = {
   type: $Enums.TransactionType
   paymentType: $Enums.PaymentType
   totalAmount: number
+  remainingAmount?: number
   status: $Enums.TransactionStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   createdBy: Prisma.UserCreateNestedOneWithoutTransactionsInput
   debtor?: Prisma.DebtorCreateNestedOneWithoutTransactionsInput
   items?: Prisma.TransactionItemCreateNestedManyWithoutTransactionInput
+  payments?: Prisma.PaymentCreateNestedManyWithoutTransactionInput
 }
 
 export type TransactionUncheckedCreateWithoutMarketInput = {
@@ -727,10 +783,12 @@ export type TransactionUncheckedCreateWithoutMarketInput = {
   type: $Enums.TransactionType
   paymentType: $Enums.PaymentType
   totalAmount: number
+  remainingAmount?: number
   status: $Enums.TransactionStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   items?: Prisma.TransactionItemUncheckedCreateNestedManyWithoutTransactionInput
+  payments?: Prisma.PaymentUncheckedCreateNestedManyWithoutTransactionInput
 }
 
 export type TransactionCreateOrConnectWithoutMarketInput = {
@@ -764,12 +822,14 @@ export type TransactionCreateWithoutDebtorInput = {
   type: $Enums.TransactionType
   paymentType: $Enums.PaymentType
   totalAmount: number
+  remainingAmount?: number
   status: $Enums.TransactionStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   createdBy: Prisma.UserCreateNestedOneWithoutTransactionsInput
   market: Prisma.MarketCreateNestedOneWithoutTransactionsInput
   items?: Prisma.TransactionItemCreateNestedManyWithoutTransactionInput
+  payments?: Prisma.PaymentCreateNestedManyWithoutTransactionInput
 }
 
 export type TransactionUncheckedCreateWithoutDebtorInput = {
@@ -779,10 +839,12 @@ export type TransactionUncheckedCreateWithoutDebtorInput = {
   type: $Enums.TransactionType
   paymentType: $Enums.PaymentType
   totalAmount: number
+  remainingAmount?: number
   status: $Enums.TransactionStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   items?: Prisma.TransactionItemUncheckedCreateNestedManyWithoutTransactionInput
+  payments?: Prisma.PaymentUncheckedCreateNestedManyWithoutTransactionInput
 }
 
 export type TransactionCreateOrConnectWithoutDebtorInput = {
@@ -816,12 +878,14 @@ export type TransactionCreateWithoutItemsInput = {
   type: $Enums.TransactionType
   paymentType: $Enums.PaymentType
   totalAmount: number
+  remainingAmount?: number
   status: $Enums.TransactionStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   createdBy: Prisma.UserCreateNestedOneWithoutTransactionsInput
   debtor?: Prisma.DebtorCreateNestedOneWithoutTransactionsInput
   market: Prisma.MarketCreateNestedOneWithoutTransactionsInput
+  payments?: Prisma.PaymentCreateNestedManyWithoutTransactionInput
 }
 
 export type TransactionUncheckedCreateWithoutItemsInput = {
@@ -832,9 +896,11 @@ export type TransactionUncheckedCreateWithoutItemsInput = {
   type: $Enums.TransactionType
   paymentType: $Enums.PaymentType
   totalAmount: number
+  remainingAmount?: number
   status: $Enums.TransactionStatus
   createdAt?: Date | string
   updatedAt?: Date | string
+  payments?: Prisma.PaymentUncheckedCreateNestedManyWithoutTransactionInput
 }
 
 export type TransactionCreateOrConnectWithoutItemsInput = {
@@ -858,12 +924,14 @@ export type TransactionUpdateWithoutItemsInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   totalAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  remainingAmount?: Prisma.FloatFieldUpdateOperationsInput | number
   status?: Prisma.EnumTransactionStatusFieldUpdateOperationsInput | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdBy?: Prisma.UserUpdateOneRequiredWithoutTransactionsNestedInput
   debtor?: Prisma.DebtorUpdateOneWithoutTransactionsNestedInput
   market?: Prisma.MarketUpdateOneRequiredWithoutTransactionsNestedInput
+  payments?: Prisma.PaymentUpdateManyWithoutTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateWithoutItemsInput = {
@@ -874,9 +942,87 @@ export type TransactionUncheckedUpdateWithoutItemsInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   totalAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  remainingAmount?: Prisma.FloatFieldUpdateOperationsInput | number
   status?: Prisma.EnumTransactionStatusFieldUpdateOperationsInput | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  payments?: Prisma.PaymentUncheckedUpdateManyWithoutTransactionNestedInput
+}
+
+export type TransactionCreateWithoutPaymentsInput = {
+  id?: string
+  type: $Enums.TransactionType
+  paymentType: $Enums.PaymentType
+  totalAmount: number
+  remainingAmount?: number
+  status: $Enums.TransactionStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  createdBy: Prisma.UserCreateNestedOneWithoutTransactionsInput
+  debtor?: Prisma.DebtorCreateNestedOneWithoutTransactionsInput
+  market: Prisma.MarketCreateNestedOneWithoutTransactionsInput
+  items?: Prisma.TransactionItemCreateNestedManyWithoutTransactionInput
+}
+
+export type TransactionUncheckedCreateWithoutPaymentsInput = {
+  id?: string
+  marketId: string
+  createdById: string
+  debtorId?: string | null
+  type: $Enums.TransactionType
+  paymentType: $Enums.PaymentType
+  totalAmount: number
+  remainingAmount?: number
+  status: $Enums.TransactionStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  items?: Prisma.TransactionItemUncheckedCreateNestedManyWithoutTransactionInput
+}
+
+export type TransactionCreateOrConnectWithoutPaymentsInput = {
+  where: Prisma.TransactionWhereUniqueInput
+  create: Prisma.XOR<Prisma.TransactionCreateWithoutPaymentsInput, Prisma.TransactionUncheckedCreateWithoutPaymentsInput>
+}
+
+export type TransactionUpsertWithoutPaymentsInput = {
+  update: Prisma.XOR<Prisma.TransactionUpdateWithoutPaymentsInput, Prisma.TransactionUncheckedUpdateWithoutPaymentsInput>
+  create: Prisma.XOR<Prisma.TransactionCreateWithoutPaymentsInput, Prisma.TransactionUncheckedCreateWithoutPaymentsInput>
+  where?: Prisma.TransactionWhereInput
+}
+
+export type TransactionUpdateToOneWithWhereWithoutPaymentsInput = {
+  where?: Prisma.TransactionWhereInput
+  data: Prisma.XOR<Prisma.TransactionUpdateWithoutPaymentsInput, Prisma.TransactionUncheckedUpdateWithoutPaymentsInput>
+}
+
+export type TransactionUpdateWithoutPaymentsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
+  paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
+  totalAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  remainingAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  status?: Prisma.EnumTransactionStatusFieldUpdateOperationsInput | $Enums.TransactionStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdBy?: Prisma.UserUpdateOneRequiredWithoutTransactionsNestedInput
+  debtor?: Prisma.DebtorUpdateOneWithoutTransactionsNestedInput
+  market?: Prisma.MarketUpdateOneRequiredWithoutTransactionsNestedInput
+  items?: Prisma.TransactionItemUpdateManyWithoutTransactionNestedInput
+}
+
+export type TransactionUncheckedUpdateWithoutPaymentsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  marketId?: Prisma.StringFieldUpdateOperationsInput | string
+  createdById?: Prisma.StringFieldUpdateOperationsInput | string
+  debtorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
+  paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
+  totalAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  remainingAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  status?: Prisma.EnumTransactionStatusFieldUpdateOperationsInput | $Enums.TransactionStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  items?: Prisma.TransactionItemUncheckedUpdateManyWithoutTransactionNestedInput
 }
 
 export type TransactionCreateManyCreatedByInput = {
@@ -886,6 +1032,7 @@ export type TransactionCreateManyCreatedByInput = {
   type: $Enums.TransactionType
   paymentType: $Enums.PaymentType
   totalAmount: number
+  remainingAmount?: number
   status: $Enums.TransactionStatus
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -896,12 +1043,14 @@ export type TransactionUpdateWithoutCreatedByInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   totalAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  remainingAmount?: Prisma.FloatFieldUpdateOperationsInput | number
   status?: Prisma.EnumTransactionStatusFieldUpdateOperationsInput | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   debtor?: Prisma.DebtorUpdateOneWithoutTransactionsNestedInput
   market?: Prisma.MarketUpdateOneRequiredWithoutTransactionsNestedInput
   items?: Prisma.TransactionItemUpdateManyWithoutTransactionNestedInput
+  payments?: Prisma.PaymentUpdateManyWithoutTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateWithoutCreatedByInput = {
@@ -911,10 +1060,12 @@ export type TransactionUncheckedUpdateWithoutCreatedByInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   totalAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  remainingAmount?: Prisma.FloatFieldUpdateOperationsInput | number
   status?: Prisma.EnumTransactionStatusFieldUpdateOperationsInput | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   items?: Prisma.TransactionItemUncheckedUpdateManyWithoutTransactionNestedInput
+  payments?: Prisma.PaymentUncheckedUpdateManyWithoutTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateManyWithoutCreatedByInput = {
@@ -924,6 +1075,7 @@ export type TransactionUncheckedUpdateManyWithoutCreatedByInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   totalAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  remainingAmount?: Prisma.FloatFieldUpdateOperationsInput | number
   status?: Prisma.EnumTransactionStatusFieldUpdateOperationsInput | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -936,6 +1088,7 @@ export type TransactionCreateManyMarketInput = {
   type: $Enums.TransactionType
   paymentType: $Enums.PaymentType
   totalAmount: number
+  remainingAmount?: number
   status: $Enums.TransactionStatus
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -946,12 +1099,14 @@ export type TransactionUpdateWithoutMarketInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   totalAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  remainingAmount?: Prisma.FloatFieldUpdateOperationsInput | number
   status?: Prisma.EnumTransactionStatusFieldUpdateOperationsInput | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdBy?: Prisma.UserUpdateOneRequiredWithoutTransactionsNestedInput
   debtor?: Prisma.DebtorUpdateOneWithoutTransactionsNestedInput
   items?: Prisma.TransactionItemUpdateManyWithoutTransactionNestedInput
+  payments?: Prisma.PaymentUpdateManyWithoutTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateWithoutMarketInput = {
@@ -961,10 +1116,12 @@ export type TransactionUncheckedUpdateWithoutMarketInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   totalAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  remainingAmount?: Prisma.FloatFieldUpdateOperationsInput | number
   status?: Prisma.EnumTransactionStatusFieldUpdateOperationsInput | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   items?: Prisma.TransactionItemUncheckedUpdateManyWithoutTransactionNestedInput
+  payments?: Prisma.PaymentUncheckedUpdateManyWithoutTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateManyWithoutMarketInput = {
@@ -974,6 +1131,7 @@ export type TransactionUncheckedUpdateManyWithoutMarketInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   totalAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  remainingAmount?: Prisma.FloatFieldUpdateOperationsInput | number
   status?: Prisma.EnumTransactionStatusFieldUpdateOperationsInput | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -986,6 +1144,7 @@ export type TransactionCreateManyDebtorInput = {
   type: $Enums.TransactionType
   paymentType: $Enums.PaymentType
   totalAmount: number
+  remainingAmount?: number
   status: $Enums.TransactionStatus
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -996,12 +1155,14 @@ export type TransactionUpdateWithoutDebtorInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   totalAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  remainingAmount?: Prisma.FloatFieldUpdateOperationsInput | number
   status?: Prisma.EnumTransactionStatusFieldUpdateOperationsInput | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdBy?: Prisma.UserUpdateOneRequiredWithoutTransactionsNestedInput
   market?: Prisma.MarketUpdateOneRequiredWithoutTransactionsNestedInput
   items?: Prisma.TransactionItemUpdateManyWithoutTransactionNestedInput
+  payments?: Prisma.PaymentUpdateManyWithoutTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateWithoutDebtorInput = {
@@ -1011,10 +1172,12 @@ export type TransactionUncheckedUpdateWithoutDebtorInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   totalAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  remainingAmount?: Prisma.FloatFieldUpdateOperationsInput | number
   status?: Prisma.EnumTransactionStatusFieldUpdateOperationsInput | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   items?: Prisma.TransactionItemUncheckedUpdateManyWithoutTransactionNestedInput
+  payments?: Prisma.PaymentUncheckedUpdateManyWithoutTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateManyWithoutDebtorInput = {
@@ -1024,6 +1187,7 @@ export type TransactionUncheckedUpdateManyWithoutDebtorInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   totalAmount?: Prisma.FloatFieldUpdateOperationsInput | number
+  remainingAmount?: Prisma.FloatFieldUpdateOperationsInput | number
   status?: Prisma.EnumTransactionStatusFieldUpdateOperationsInput | $Enums.TransactionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1036,10 +1200,12 @@ export type TransactionUncheckedUpdateManyWithoutDebtorInput = {
 
 export type TransactionCountOutputType = {
   items: number
+  payments: number
 }
 
 export type TransactionCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   items?: boolean | TransactionCountOutputTypeCountItemsArgs
+  payments?: boolean | TransactionCountOutputTypeCountPaymentsArgs
 }
 
 /**
@@ -1059,6 +1225,13 @@ export type TransactionCountOutputTypeCountItemsArgs<ExtArgs extends runtime.Typ
   where?: Prisma.TransactionItemWhereInput
 }
 
+/**
+ * TransactionCountOutputType without action
+ */
+export type TransactionCountOutputTypeCountPaymentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.PaymentWhereInput
+}
+
 
 export type TransactionSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1068,6 +1241,7 @@ export type TransactionSelect<ExtArgs extends runtime.Types.Extensions.InternalA
   type?: boolean
   paymentType?: boolean
   totalAmount?: boolean
+  remainingAmount?: boolean
   status?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1075,6 +1249,7 @@ export type TransactionSelect<ExtArgs extends runtime.Types.Extensions.InternalA
   debtor?: boolean | Prisma.Transaction$debtorArgs<ExtArgs>
   market?: boolean | Prisma.MarketDefaultArgs<ExtArgs>
   items?: boolean | Prisma.Transaction$itemsArgs<ExtArgs>
+  payments?: boolean | Prisma.Transaction$paymentsArgs<ExtArgs>
   _count?: boolean | Prisma.TransactionCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["transaction"]>
 
@@ -1086,6 +1261,7 @@ export type TransactionSelectCreateManyAndReturn<ExtArgs extends runtime.Types.E
   type?: boolean
   paymentType?: boolean
   totalAmount?: boolean
+  remainingAmount?: boolean
   status?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1102,6 +1278,7 @@ export type TransactionSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.E
   type?: boolean
   paymentType?: boolean
   totalAmount?: boolean
+  remainingAmount?: boolean
   status?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1118,17 +1295,19 @@ export type TransactionSelectScalar = {
   type?: boolean
   paymentType?: boolean
   totalAmount?: boolean
+  remainingAmount?: boolean
   status?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type TransactionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "marketId" | "createdById" | "debtorId" | "type" | "paymentType" | "totalAmount" | "status" | "createdAt" | "updatedAt", ExtArgs["result"]["transaction"]>
+export type TransactionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "marketId" | "createdById" | "debtorId" | "type" | "paymentType" | "totalAmount" | "remainingAmount" | "status" | "createdAt" | "updatedAt", ExtArgs["result"]["transaction"]>
 export type TransactionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   debtor?: boolean | Prisma.Transaction$debtorArgs<ExtArgs>
   market?: boolean | Prisma.MarketDefaultArgs<ExtArgs>
   items?: boolean | Prisma.Transaction$itemsArgs<ExtArgs>
+  payments?: boolean | Prisma.Transaction$paymentsArgs<ExtArgs>
   _count?: boolean | Prisma.TransactionCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type TransactionIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1149,6 +1328,7 @@ export type $TransactionPayload<ExtArgs extends runtime.Types.Extensions.Interna
     debtor: Prisma.$DebtorPayload<ExtArgs> | null
     market: Prisma.$MarketPayload<ExtArgs>
     items: Prisma.$TransactionItemPayload<ExtArgs>[]
+    payments: Prisma.$PaymentPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1158,6 +1338,7 @@ export type $TransactionPayload<ExtArgs extends runtime.Types.Extensions.Interna
     type: $Enums.TransactionType
     paymentType: $Enums.PaymentType
     totalAmount: number
+    remainingAmount: number
     status: $Enums.TransactionStatus
     createdAt: Date
     updatedAt: Date
@@ -1559,6 +1740,7 @@ export interface Prisma__TransactionClient<T, Null = never, ExtArgs extends runt
   debtor<T extends Prisma.Transaction$debtorArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Transaction$debtorArgs<ExtArgs>>): Prisma.Prisma__DebtorClient<runtime.Types.Result.GetResult<Prisma.$DebtorPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   market<T extends Prisma.MarketDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketDefaultArgs<ExtArgs>>): Prisma.Prisma__MarketClient<runtime.Types.Result.GetResult<Prisma.$MarketPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   items<T extends Prisma.Transaction$itemsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Transaction$itemsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TransactionItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  payments<T extends Prisma.Transaction$paymentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Transaction$paymentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PaymentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1595,6 +1777,7 @@ export interface TransactionFieldRefs {
   readonly type: Prisma.FieldRef<"Transaction", 'TransactionType'>
   readonly paymentType: Prisma.FieldRef<"Transaction", 'PaymentType'>
   readonly totalAmount: Prisma.FieldRef<"Transaction", 'Float'>
+  readonly remainingAmount: Prisma.FieldRef<"Transaction", 'Float'>
   readonly status: Prisma.FieldRef<"Transaction", 'TransactionStatus'>
   readonly createdAt: Prisma.FieldRef<"Transaction", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Transaction", 'DateTime'>
@@ -2039,6 +2222,30 @@ export type Transaction$itemsArgs<ExtArgs extends runtime.Types.Extensions.Inter
   take?: number
   skip?: number
   distinct?: Prisma.TransactionItemScalarFieldEnum | Prisma.TransactionItemScalarFieldEnum[]
+}
+
+/**
+ * Transaction.payments
+ */
+export type Transaction$paymentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Payment
+   */
+  select?: Prisma.PaymentSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Payment
+   */
+  omit?: Prisma.PaymentOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.PaymentInclude<ExtArgs> | null
+  where?: Prisma.PaymentWhereInput
+  orderBy?: Prisma.PaymentOrderByWithRelationInput | Prisma.PaymentOrderByWithRelationInput[]
+  cursor?: Prisma.PaymentWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.PaymentScalarFieldEnum | Prisma.PaymentScalarFieldEnum[]
 }
 
 /**

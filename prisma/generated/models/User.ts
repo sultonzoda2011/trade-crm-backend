@@ -207,6 +207,7 @@ export type UserWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   transactions?: Prisma.TransactionListRelationFilter
+  payments?: Prisma.PaymentListRelationFilter
   market?: Prisma.XOR<Prisma.MarketNullableScalarRelationFilter, Prisma.MarketWhereInput> | null
   ownedMarkets?: Prisma.MarketListRelationFilter
   refreshTokens?: Prisma.RefreshTokenListRelationFilter
@@ -222,6 +223,7 @@ export type UserOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   transactions?: Prisma.TransactionOrderByRelationAggregateInput
+  payments?: Prisma.PaymentOrderByRelationAggregateInput
   market?: Prisma.MarketOrderByWithRelationInput
   ownedMarkets?: Prisma.MarketOrderByRelationAggregateInput
   refreshTokens?: Prisma.RefreshTokenOrderByRelationAggregateInput
@@ -240,6 +242,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   transactions?: Prisma.TransactionListRelationFilter
+  payments?: Prisma.PaymentListRelationFilter
   market?: Prisma.XOR<Prisma.MarketNullableScalarRelationFilter, Prisma.MarketWhereInput> | null
   ownedMarkets?: Prisma.MarketListRelationFilter
   refreshTokens?: Prisma.RefreshTokenListRelationFilter
@@ -282,6 +285,7 @@ export type UserCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   transactions?: Prisma.TransactionCreateNestedManyWithoutCreatedByInput
+  payments?: Prisma.PaymentCreateNestedManyWithoutCreatedByInput
   market?: Prisma.MarketCreateNestedOneWithoutUsersInput
   ownedMarkets?: Prisma.MarketCreateNestedManyWithoutOwnerInput
   refreshTokens?: Prisma.RefreshTokenCreateNestedManyWithoutUserInput
@@ -297,6 +301,7 @@ export type UserUncheckedCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutCreatedByInput
+  payments?: Prisma.PaymentUncheckedCreateNestedManyWithoutCreatedByInput
   ownedMarkets?: Prisma.MarketUncheckedCreateNestedManyWithoutOwnerInput
   refreshTokens?: Prisma.RefreshTokenUncheckedCreateNestedManyWithoutUserInput
 }
@@ -310,6 +315,7 @@ export type UserUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   transactions?: Prisma.TransactionUpdateManyWithoutCreatedByNestedInput
+  payments?: Prisma.PaymentUpdateManyWithoutCreatedByNestedInput
   market?: Prisma.MarketUpdateOneWithoutUsersNestedInput
   ownedMarkets?: Prisma.MarketUpdateManyWithoutOwnerNestedInput
   refreshTokens?: Prisma.RefreshTokenUpdateManyWithoutUserNestedInput
@@ -325,6 +331,7 @@ export type UserUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutCreatedByNestedInput
+  payments?: Prisma.PaymentUncheckedUpdateManyWithoutCreatedByNestedInput
   ownedMarkets?: Prisma.MarketUncheckedUpdateManyWithoutOwnerNestedInput
   refreshTokens?: Prisma.RefreshTokenUncheckedUpdateManyWithoutUserNestedInput
 }
@@ -509,6 +516,20 @@ export type UserUpdateOneRequiredWithoutTransactionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutTransactionsInput, Prisma.UserUpdateWithoutTransactionsInput>, Prisma.UserUncheckedUpdateWithoutTransactionsInput>
 }
 
+export type UserCreateNestedOneWithoutPaymentsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutPaymentsInput, Prisma.UserUncheckedCreateWithoutPaymentsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutPaymentsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutPaymentsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutPaymentsInput, Prisma.UserUncheckedCreateWithoutPaymentsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutPaymentsInput
+  upsert?: Prisma.UserUpsertWithoutPaymentsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutPaymentsInput, Prisma.UserUpdateWithoutPaymentsInput>, Prisma.UserUncheckedUpdateWithoutPaymentsInput>
+}
+
 export type UserCreateWithoutRefreshTokensInput = {
   id?: string
   name: string
@@ -518,6 +539,7 @@ export type UserCreateWithoutRefreshTokensInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   transactions?: Prisma.TransactionCreateNestedManyWithoutCreatedByInput
+  payments?: Prisma.PaymentCreateNestedManyWithoutCreatedByInput
   market?: Prisma.MarketCreateNestedOneWithoutUsersInput
   ownedMarkets?: Prisma.MarketCreateNestedManyWithoutOwnerInput
 }
@@ -532,6 +554,7 @@ export type UserUncheckedCreateWithoutRefreshTokensInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutCreatedByInput
+  payments?: Prisma.PaymentUncheckedCreateNestedManyWithoutCreatedByInput
   ownedMarkets?: Prisma.MarketUncheckedCreateNestedManyWithoutOwnerInput
 }
 
@@ -560,6 +583,7 @@ export type UserUpdateWithoutRefreshTokensInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   transactions?: Prisma.TransactionUpdateManyWithoutCreatedByNestedInput
+  payments?: Prisma.PaymentUpdateManyWithoutCreatedByNestedInput
   market?: Prisma.MarketUpdateOneWithoutUsersNestedInput
   ownedMarkets?: Prisma.MarketUpdateManyWithoutOwnerNestedInput
 }
@@ -574,6 +598,7 @@ export type UserUncheckedUpdateWithoutRefreshTokensInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutCreatedByNestedInput
+  payments?: Prisma.PaymentUncheckedUpdateManyWithoutCreatedByNestedInput
   ownedMarkets?: Prisma.MarketUncheckedUpdateManyWithoutOwnerNestedInput
 }
 
@@ -586,6 +611,7 @@ export type UserCreateWithoutOwnedMarketsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   transactions?: Prisma.TransactionCreateNestedManyWithoutCreatedByInput
+  payments?: Prisma.PaymentCreateNestedManyWithoutCreatedByInput
   market?: Prisma.MarketCreateNestedOneWithoutUsersInput
   refreshTokens?: Prisma.RefreshTokenCreateNestedManyWithoutUserInput
 }
@@ -600,6 +626,7 @@ export type UserUncheckedCreateWithoutOwnedMarketsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutCreatedByInput
+  payments?: Prisma.PaymentUncheckedCreateNestedManyWithoutCreatedByInput
   refreshTokens?: Prisma.RefreshTokenUncheckedCreateNestedManyWithoutUserInput
 }
 
@@ -617,6 +644,7 @@ export type UserCreateWithoutMarketInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   transactions?: Prisma.TransactionCreateNestedManyWithoutCreatedByInput
+  payments?: Prisma.PaymentCreateNestedManyWithoutCreatedByInput
   ownedMarkets?: Prisma.MarketCreateNestedManyWithoutOwnerInput
   refreshTokens?: Prisma.RefreshTokenCreateNestedManyWithoutUserInput
 }
@@ -630,6 +658,7 @@ export type UserUncheckedCreateWithoutMarketInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutCreatedByInput
+  payments?: Prisma.PaymentUncheckedCreateNestedManyWithoutCreatedByInput
   ownedMarkets?: Prisma.MarketUncheckedCreateNestedManyWithoutOwnerInput
   refreshTokens?: Prisma.RefreshTokenUncheckedCreateNestedManyWithoutUserInput
 }
@@ -664,6 +693,7 @@ export type UserUpdateWithoutOwnedMarketsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   transactions?: Prisma.TransactionUpdateManyWithoutCreatedByNestedInput
+  payments?: Prisma.PaymentUpdateManyWithoutCreatedByNestedInput
   market?: Prisma.MarketUpdateOneWithoutUsersNestedInput
   refreshTokens?: Prisma.RefreshTokenUpdateManyWithoutUserNestedInput
 }
@@ -678,6 +708,7 @@ export type UserUncheckedUpdateWithoutOwnedMarketsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutCreatedByNestedInput
+  payments?: Prisma.PaymentUncheckedUpdateManyWithoutCreatedByNestedInput
   refreshTokens?: Prisma.RefreshTokenUncheckedUpdateManyWithoutUserNestedInput
 }
 
@@ -719,6 +750,7 @@ export type UserCreateWithoutTransactionsInput = {
   role: $Enums.Role
   createdAt?: Date | string
   updatedAt?: Date | string
+  payments?: Prisma.PaymentCreateNestedManyWithoutCreatedByInput
   market?: Prisma.MarketCreateNestedOneWithoutUsersInput
   ownedMarkets?: Prisma.MarketCreateNestedManyWithoutOwnerInput
   refreshTokens?: Prisma.RefreshTokenCreateNestedManyWithoutUserInput
@@ -733,6 +765,7 @@ export type UserUncheckedCreateWithoutTransactionsInput = {
   marketId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  payments?: Prisma.PaymentUncheckedCreateNestedManyWithoutCreatedByInput
   ownedMarkets?: Prisma.MarketUncheckedCreateNestedManyWithoutOwnerInput
   refreshTokens?: Prisma.RefreshTokenUncheckedCreateNestedManyWithoutUserInput
 }
@@ -761,6 +794,7 @@ export type UserUpdateWithoutTransactionsInput = {
   role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  payments?: Prisma.PaymentUpdateManyWithoutCreatedByNestedInput
   market?: Prisma.MarketUpdateOneWithoutUsersNestedInput
   ownedMarkets?: Prisma.MarketUpdateManyWithoutOwnerNestedInput
   refreshTokens?: Prisma.RefreshTokenUpdateManyWithoutUserNestedInput
@@ -775,6 +809,79 @@ export type UserUncheckedUpdateWithoutTransactionsInput = {
   marketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  payments?: Prisma.PaymentUncheckedUpdateManyWithoutCreatedByNestedInput
+  ownedMarkets?: Prisma.MarketUncheckedUpdateManyWithoutOwnerNestedInput
+  refreshTokens?: Prisma.RefreshTokenUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutPaymentsInput = {
+  id?: string
+  name: string
+  email: string
+  password: string
+  role: $Enums.Role
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  transactions?: Prisma.TransactionCreateNestedManyWithoutCreatedByInput
+  market?: Prisma.MarketCreateNestedOneWithoutUsersInput
+  ownedMarkets?: Prisma.MarketCreateNestedManyWithoutOwnerInput
+  refreshTokens?: Prisma.RefreshTokenCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutPaymentsInput = {
+  id?: string
+  name: string
+  email: string
+  password: string
+  role: $Enums.Role
+  marketId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutCreatedByInput
+  ownedMarkets?: Prisma.MarketUncheckedCreateNestedManyWithoutOwnerInput
+  refreshTokens?: Prisma.RefreshTokenUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutPaymentsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutPaymentsInput, Prisma.UserUncheckedCreateWithoutPaymentsInput>
+}
+
+export type UserUpsertWithoutPaymentsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutPaymentsInput, Prisma.UserUncheckedUpdateWithoutPaymentsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutPaymentsInput, Prisma.UserUncheckedCreateWithoutPaymentsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutPaymentsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutPaymentsInput, Prisma.UserUncheckedUpdateWithoutPaymentsInput>
+}
+
+export type UserUpdateWithoutPaymentsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  password?: Prisma.StringFieldUpdateOperationsInput | string
+  role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  transactions?: Prisma.TransactionUpdateManyWithoutCreatedByNestedInput
+  market?: Prisma.MarketUpdateOneWithoutUsersNestedInput
+  ownedMarkets?: Prisma.MarketUpdateManyWithoutOwnerNestedInput
+  refreshTokens?: Prisma.RefreshTokenUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutPaymentsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  password?: Prisma.StringFieldUpdateOperationsInput | string
+  role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
+  marketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutCreatedByNestedInput
   ownedMarkets?: Prisma.MarketUncheckedUpdateManyWithoutOwnerNestedInput
   refreshTokens?: Prisma.RefreshTokenUncheckedUpdateManyWithoutUserNestedInput
 }
@@ -798,6 +905,7 @@ export type UserUpdateWithoutMarketInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   transactions?: Prisma.TransactionUpdateManyWithoutCreatedByNestedInput
+  payments?: Prisma.PaymentUpdateManyWithoutCreatedByNestedInput
   ownedMarkets?: Prisma.MarketUpdateManyWithoutOwnerNestedInput
   refreshTokens?: Prisma.RefreshTokenUpdateManyWithoutUserNestedInput
 }
@@ -811,6 +919,7 @@ export type UserUncheckedUpdateWithoutMarketInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutCreatedByNestedInput
+  payments?: Prisma.PaymentUncheckedUpdateManyWithoutCreatedByNestedInput
   ownedMarkets?: Prisma.MarketUncheckedUpdateManyWithoutOwnerNestedInput
   refreshTokens?: Prisma.RefreshTokenUncheckedUpdateManyWithoutUserNestedInput
 }
@@ -832,12 +941,14 @@ export type UserUncheckedUpdateManyWithoutMarketInput = {
 
 export type UserCountOutputType = {
   transactions: number
+  payments: number
   ownedMarkets: number
   refreshTokens: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   transactions?: boolean | UserCountOutputTypeCountTransactionsArgs
+  payments?: boolean | UserCountOutputTypeCountPaymentsArgs
   ownedMarkets?: boolean | UserCountOutputTypeCountOwnedMarketsArgs
   refreshTokens?: boolean | UserCountOutputTypeCountRefreshTokensArgs
 }
@@ -857,6 +968,13 @@ export type UserCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensi
  */
 export type UserCountOutputTypeCountTransactionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.TransactionWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountPaymentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.PaymentWhereInput
 }
 
 /**
@@ -884,6 +1002,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   createdAt?: boolean
   updatedAt?: boolean
   transactions?: boolean | Prisma.User$transactionsArgs<ExtArgs>
+  payments?: boolean | Prisma.User$paymentsArgs<ExtArgs>
   market?: boolean | Prisma.User$marketArgs<ExtArgs>
   ownedMarkets?: boolean | Prisma.User$ownedMarketsArgs<ExtArgs>
   refreshTokens?: boolean | Prisma.User$refreshTokensArgs<ExtArgs>
@@ -928,6 +1047,7 @@ export type UserSelectScalar = {
 export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "email" | "password" | "role" | "marketId" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   transactions?: boolean | Prisma.User$transactionsArgs<ExtArgs>
+  payments?: boolean | Prisma.User$paymentsArgs<ExtArgs>
   market?: boolean | Prisma.User$marketArgs<ExtArgs>
   ownedMarkets?: boolean | Prisma.User$ownedMarketsArgs<ExtArgs>
   refreshTokens?: boolean | Prisma.User$refreshTokensArgs<ExtArgs>
@@ -944,6 +1064,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   name: "User"
   objects: {
     transactions: Prisma.$TransactionPayload<ExtArgs>[]
+    payments: Prisma.$PaymentPayload<ExtArgs>[]
     market: Prisma.$MarketPayload<ExtArgs> | null
     ownedMarkets: Prisma.$MarketPayload<ExtArgs>[]
     refreshTokens: Prisma.$RefreshTokenPayload<ExtArgs>[]
@@ -1352,6 +1473,7 @@ readonly fields: UserFieldRefs;
 export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   transactions<T extends Prisma.User$transactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$transactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  payments<T extends Prisma.User$paymentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$paymentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PaymentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   market<T extends Prisma.User$marketArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$marketArgs<ExtArgs>>): Prisma.Prisma__MarketClient<runtime.Types.Result.GetResult<Prisma.$MarketPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   ownedMarkets<T extends Prisma.User$ownedMarketsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$ownedMarketsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   refreshTokens<T extends Prisma.User$refreshTokensArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$refreshTokensArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RefreshTokenPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -1814,6 +1936,30 @@ export type User$transactionsArgs<ExtArgs extends runtime.Types.Extensions.Inter
   take?: number
   skip?: number
   distinct?: Prisma.TransactionScalarFieldEnum | Prisma.TransactionScalarFieldEnum[]
+}
+
+/**
+ * User.payments
+ */
+export type User$paymentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Payment
+   */
+  select?: Prisma.PaymentSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Payment
+   */
+  omit?: Prisma.PaymentOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.PaymentInclude<ExtArgs> | null
+  where?: Prisma.PaymentWhereInput
+  orderBy?: Prisma.PaymentOrderByWithRelationInput | Prisma.PaymentOrderByWithRelationInput[]
+  cursor?: Prisma.PaymentWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.PaymentScalarFieldEnum | Prisma.PaymentScalarFieldEnum[]
 }
 
 /**
