@@ -9,7 +9,8 @@
 		"start:dev": "nest start --watch",
 		"prisma:generate": "prisma generate",
 		"prisma:migrate": "prisma migrate dev",
-		"prisma:studio": "prisma studio"
+		"prisma:studio": "prisma studio",
+		"prisma:seed": "ts-node prisma/seed.ts"
 	},
 	"dependencies": {
 		"@nestjs/common": "^11.1.28",
