@@ -6,6 +6,7 @@ import { JwtPayload } from '../interfaces'
 import { ApiErrorResponse } from '../common/decorators/api-error-response.decorator'
 import { TransactionsService } from './transactions.service'
 import { CreateTransactionDto } from './dto/create-transaction.dto'
+import { CreatePaymentDto } from './dto/create-payment.dto'
 import { UpdateTransactionDto } from './dto/update-transaction.dto'
 import { QueryTransactionDto } from './dto/query-transaction.dto'
 import { TransactionResponseDto } from './dto/transaction-response.dto'
@@ -57,5 +58,15 @@ export class TransactionsController {
   @ApiOkResponse({ description: 'Transaction deleted' })
   remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
     return this.transactionsService.remove(id, user.marketId)
+  }
+
+  @Patch(':id/pay')
+  @ApiOkResponse({ type: TransactionResponseDto, description: 'Payment recorded' })
+  pay(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreatePaymentDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.transactionsService.pay(id, dto, user)
   }
 }
