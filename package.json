@@ -1,7 +1,7 @@
 {
 	"name": "tradecrm-backend",
 	"version": "0.1.0",
-	"description": "TradeCRM — CRM для маркетов (NestJS + Prisma + PostgreSQL)",
+	"description": "TradeCRM — CRM for markets (NestJS + Prisma + PostgreSQL)",
 	"private": true,
 	"scripts": {
 		"build": "nest build",

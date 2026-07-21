@@ -40,7 +40,7 @@ async function bootstrap() {
 
 	const swaggerConfig = new DocumentBuilder()
 		.setTitle('TradeCRM API')
-		.setDescription('CRM для управления маркетами')
+		.setDescription('CRM for managing markets')
 		.setVersion('1.0')
 		.setContact('TradeCRM Team', '', 'support@tradecrm.com')
 		.addServer('http://localhost:4000', 'Development')

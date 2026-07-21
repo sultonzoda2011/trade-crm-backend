@@ -7,7 +7,7 @@ export class CreatePaymentDto {
   @Min(0.01)
   amount: number
 
-  @ApiPropertyOptional({ example: 'Частичная оплата' })
+  @ApiPropertyOptional({ example: 'Partial payment' })
   @IsOptional()
   @IsString()
   @MaxLength(500)
