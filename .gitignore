@@ -6,3 +6,4 @@ src/generated/
 package-lock.json
 prisma/migrations/
 prisma/generated/
+uploads/
