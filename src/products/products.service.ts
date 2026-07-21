@@ -8,7 +8,7 @@ import { UpdateProductDto } from './dto/update-product.dto'
 import { Express } from 'express'
 
 const productInclude = {
-  market: { select: { id: true, name: true, address: true } },
+  market: { select: { id: true, name: true, address: true,image:true } },
   _count: { select: { transactionItems: true } },
 } as const
 
