@@ -6,6 +6,7 @@ import { DebtorsModule } from './debtors/debtors.module'
 import { MarketsModule } from './markets/markets.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { ProductsModule } from './products/products.module'
+import { SellersModule } from './sellers/sellers.module'
 import { TransactionsModule } from './transactions/transactions.module'
 import { UsersModule } from './users/users.module'
 import { validate } from './config/env.validation'
@@ -22,6 +23,7 @@ import { validate } from './config/env.validation'
 		UsersModule,
 		MarketsModule,
 		ProductsModule,
+		SellersModule,
 		DebtorsModule,
 		TransactionsModule
 	]
