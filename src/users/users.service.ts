@@ -21,7 +21,7 @@ export class UsersService {
 		role: true,
 		createdAt: true,
 		market: {
-			select: { id: true, name: true, address: true }
+			select: { id: true, name: true, address: true, image: true }
 		}
 	} as const
 
@@ -38,8 +38,7 @@ export class UsersService {
 				name: dto.name,
 				email: dto.email,
 				password: hashed,
-				role: dto.role,
-				marketId: dto.marketId
+				role: dto.role
 			},
 			select: this.userSelect
 		})
@@ -66,9 +65,9 @@ export class UsersService {
 				select: this.userSelect,
 				orderBy: { createdAt: 'desc' },
 				skip,
-				take: limit,
+				take: limit
 			}),
-			this.prisma.user.count({ where }),
+			this.prisma.user.count({ where })
 		])
 
 		return {
@@ -77,8 +76,8 @@ export class UsersService {
 				page,
 				limit,
 				total,
-				totalPages: Math.ceil(total / limit),
-			},
+				totalPages: Math.ceil(total / limit)
+			}
 		}
 	}
 

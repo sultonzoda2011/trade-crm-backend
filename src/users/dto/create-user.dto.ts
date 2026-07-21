@@ -25,8 +25,4 @@ export class CreateUserDto {
   @IsEnum(Role)
   role: Role
 
-  @ApiPropertyOptional({ example: 'uuid' })
-  @IsOptional()
-  @IsUUID()
-  marketId?: string
 }
