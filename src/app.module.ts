@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { AuthModule } from './auth/auth.module'
 import { CommonModule } from './common/common.module'
+import { DashboardModule } from './dashboard/dashboard.module'
 import { DebtorsModule } from './debtors/debtors.module'
 import { MarketsModule } from './markets/markets.module'
 import { PrismaModule } from './prisma/prisma.module'
@@ -25,7 +26,8 @@ import { validate } from './config/env.validation'
 		ProductsModule,
 		SellersModule,
 		DebtorsModule,
-		TransactionsModule
+		TransactionsModule,
+		DashboardModule
 	]
 })
 export class AppModule {}
