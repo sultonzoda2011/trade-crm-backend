@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { QueryDashboardDto } from './dto/query-dashboard.dto'
 
 @Injectable()
 export class DashboardService {
@@ -103,5 +104,80 @@ export class DashboardService {
       recentTransactions,
       topDebtors,
     }
+  }
+
+  /**
+   * Отчёт по продавцам: сколько и на какую сумму продал каждый пользователь
+   * маркета за опциональный период. SALE и DEBT считаются отдельно, REFUND
+   * вычитается из суммы продаж того же продавца.
+   */
+  async getSellersReport(query: QueryDashboardDto, marketId?: string) {
+    const dateFilter: any = {}
+    if (query.dateFrom) dateFilter.gte = new Date(query.dateFrom)
+    if (query.dateTo) dateFilter.lte = new Date(query.dateTo)
+
+    const where: any = {
+      ...(marketId ? { marketId } : {}),
+      ...(Object.keys(dateFilter).length ? { createdAt: dateFilter } : {}),
+    }
+
+    const [saleGroups, refundGroups, debtGroups] = await Promise.all([
+      this.prisma.transaction.groupBy({
+        by: ['createdById'],
+        where: { ...where, type: 'SALE' },
+        _sum: { totalAmount: true },
+        _count: { id: true },
+      }),
+      this.prisma.transaction.groupBy({
+        by: ['createdById'],
+        where: { ...where, type: 'REFUND' },
+        _sum: { totalAmount: true },
+        _count: { id: true },
+      }),
+      this.prisma.transaction.groupBy({
+        by: ['createdById'],
+        where: { ...where, type: 'DEBT' },
+        _sum: { totalAmount: true },
+        _count: { id: true },
+      }),
+    ])
+
+    const sellerIds = [
+      ...new Set([
+        ...saleGroups.map((g) => g.createdById),
+        ...refundGroups.map((g) => g.createdById),
+        ...debtGroups.map((g) => g.createdById),
+      ]),
+    ]
+
+    const sellers = sellerIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: sellerIds } },
+          select: { id: true, name: true, email: true, role: true },
+        })
+      : []
+    const sellerMap = new Map(sellers.map((s) => [s.id, s]))
+
+    const saleMap = new Map(saleGroups.map((g) => [g.createdById, g]))
+    const refundMap = new Map(refundGroups.map((g) => [g.createdById, g]))
+    const debtMap = new Map(debtGroups.map((g) => [g.createdById, g]))
+
+    return sellerIds.map((id) => {
+      const sale = saleMap.get(id)
+      const refund = refundMap.get(id)
+      const debt = debtMap.get(id)
+      const saleAmount = sale?._sum.totalAmount ?? 0
+      const refundAmount = refund?._sum.totalAmount ?? 0
+
+      return {
+        seller: sellerMap.get(id) ?? null,
+        salesCount: sale?._count.id ?? 0,
+        salesAmount: saleAmount - refundAmount,
+        refundsCount: refund?._count.id ?? 0,
+        refundsAmount: refundAmount,
+        debtsCount: debt?._count.id ?? 0,
+        debtsAmount: debt?._sum.totalAmount ?? 0,
+      }
+    })
   }
 }
