@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
+import { APP_GUARD } from '@nestjs/core'
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import { AuthModule } from './auth/auth.module'
+import { CategoriesModule } from './categories/categories.module'
 import { CommonModule } from './common/common.module'
 import { DashboardModule } from './dashboard/dashboard.module'
 import { DebtorsModule } from './debtors/debtors.module'
@@ -18,16 +21,21 @@ import { validate } from './config/env.validation'
 			isGlobal: true,
 			validate
 		}),
+		// Общий лимит запросов на IP; /auth/login дополнительно защищён более
+		// строгим лимитом через @Throttle() на конкретном эндпоинте.
+		ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
 		PrismaModule,
 		AuthModule,
 		CommonModule,
 		UsersModule,
 		MarketsModule,
+		CategoriesModule,
 		ProductsModule,
 		SellersModule,
 		DebtorsModule,
 		TransactionsModule,
 		DashboardModule
-	]
+	],
+	providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }]
 })
 export class AppModule {}
