@@ -2,6 +2,25 @@
 
 **v0.1.0** — RESTful CRM API for managing markets and bazaars. Built with NestJS, Prisma, and PostgreSQL.
 
+## ⚠️ После обновления схемы (audit fixes, июль 2026)
+
+Схема Prisma была изменена (новые поля/модели: `Category`, `ProductUnit`, `REFUND`/`REFUNDED`,
+`dueDate`, `discount`, cascade-delete, индексы). Перед первым запуском обязательно:
+
+```bash
+npm install
+npx prisma generate
+npx prisma migrate dev --name audit-fixes
+npm run prisma:seed   # опционально, тестовые данные
+npm run start:dev
+```
+
+Локально (в песочнице, где готовился этот патч) `prisma generate`/`migrate` выполнить не удалось —
+нет доступа к `binaries.prisma.sh` из sandboxed-окружения, поэтому клиент Prisma в
+`prisma/generated`, приложенный в архиве, **устаревший** (сгенерирован под старую схему).
+Его обязательно нужно пересоздать командой выше перед сборкой/запуском — без этого `npm run build`
+покажет ошибки типов на новых полях (`categoryId`, `unit`, `dueDate`, `discount`, `REFUND` и т.д.).
+
 ## Tech Stack
 
 | Layer | Technology |
