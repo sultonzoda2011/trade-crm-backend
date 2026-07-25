@@ -1,6 +1,8 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common'
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import { Roles } from '../auth/decorators/roles.decorator'
+import { Role } from '../enums'
 import { JwtPayload } from '../interfaces'
 import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe'
 import { ApiErrorResponse } from '../common/decorators/api-error-response.decorator'
@@ -50,6 +52,7 @@ export class DebtorsController {
   }
 
   @Delete(':id')
+  @Roles(Role.ADMIN, Role.OWNER)
   @ApiOkResponse({ description: 'Debtor deleted' })
   remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
     return this.debtorsService.remove(id, user.marketId)

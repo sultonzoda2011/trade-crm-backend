@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { PaginatedResult } from '../common/dto/pagination.dto'
+import { paginate } from '../common/utils/paginate.util'
 import { CreateDebtorDto } from './dto/create-debtor.dto'
 import { QueryDebtorDto } from './dto/query-debtor.dto'
 import { UpdateDebtorDto } from './dto/update-debtor.dto'
@@ -30,30 +31,12 @@ export class DebtorsService {
       ]
     }
 
-    const page = query.page ?? 1
-    const limit = query.limit ?? 20
-    const skip = (page - 1) * limit
-
-    const [data, total] = await Promise.all([
-      this.prisma.debtor.findMany({
-        where,
-        include: debtorInclude,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      this.prisma.debtor.count({ where }),
-    ])
-
-    return {
-      data,
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    }
+    return paginate(
+      query,
+      ({ skip, take }) =>
+        this.prisma.debtor.findMany({ where, include: debtorInclude, orderBy: { createdAt: 'desc' }, skip, take }),
+      () => this.prisma.debtor.count({ where }),
+    )
   }
 
   async findOne(id: string, userMarketId?: string) {
