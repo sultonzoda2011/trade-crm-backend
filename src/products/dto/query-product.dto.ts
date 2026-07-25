@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
+import { IsBoolean, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 
@@ -22,4 +22,15 @@ export class QueryProductDto {
   @IsOptional()
   @IsString()
   search?: string
+
+  @ApiPropertyOptional({ description: 'Filter by category ID' })
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string
+
+  @ApiPropertyOptional({ description: 'Return only products at or below their low-stock threshold' })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  lowStock?: boolean
 }

@@ -2,6 +2,8 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile,
 import { FileInterceptor } from '@nestjs/platform-express'
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import { Roles } from '../auth/decorators/roles.decorator'
+import { Role } from '../enums'
 import { JwtPayload } from '../interfaces'
 import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe'
 import { ApiErrorResponse } from '../common/decorators/api-error-response.decorator'
@@ -14,9 +16,12 @@ import { ProductResponseDto } from './dto/product-response.dto'
 import { PaginatedResult } from '../common/dto/pagination.dto'
 import { Express } from 'express'
 
+// SELLER по бизнес-требованиям проекта не имеет доступа к складу/товарам —
+// только ADMIN (кросс-маркет) и OWNER (свой маркет) могут работать с продуктами.
 @ApiTags('Products')
 @ApiBearerAuth()
 @ApiErrorResponse()
+@Roles(Role.ADMIN, Role.OWNER)
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}

@@ -2,13 +2,15 @@ import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/co
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../common/services/storage.service'
 import { PaginatedResult } from '../common/dto/pagination.dto'
+import { paginate } from '../common/utils/paginate.util'
 import { CreateProductDto } from './dto/create-product.dto'
 import { QueryProductDto } from './dto/query-product.dto'
 import { UpdateProductDto } from './dto/update-product.dto'
 import { Express } from 'express'
 
 const productInclude = {
-  market: { select: { id: true, name: true, address: true,image:true } },
+  market: { select: { id: true, name: true, address: true, image: true } },
+  category: { select: { id: true, name: true } },
   _count: { select: { transactionItems: true } },
 } as const
 
@@ -21,7 +23,7 @@ export class ProductsService {
 
   async create(dto: CreateProductDto, file: Express.Multer.File, marketId?: string) {
     if (!marketId) throw new UnauthorizedException('User is not assigned to a market')
-    const image = file ? this.storageService.save(file, 'products') : undefined
+    const image = file ? await this.storageService.save(file, 'products') : undefined
     return this.prisma.product.create({ data: { ...dto, image, marketId }, include: productInclude })
   }
 
@@ -29,34 +31,38 @@ export class ProductsService {
     const where: any = {}
 
     if (userMarketId) where.marketId = userMarketId
+    if (query.categoryId) where.categoryId = query.categoryId
     if (query.search) {
       where.name = { contains: query.search, mode: 'insensitive' }
     }
-
-    const page = query.page ?? 1
-    const limit = query.limit ?? 20
-    const skip = (page - 1) * limit
-
-    const [data, total] = await Promise.all([
-      this.prisma.product.findMany({
-        where,
-        include: productInclude,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      this.prisma.product.count({ where }),
-    ])
-
-    return {
-      data,
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+    if (query.lowStock) {
+      // Prisma не умеет сравнивать два поля одной модели в where напрямую,
+      // поэтому для флага "мало на складе" фильтруем через $queryRaw-подобный
+      // подход: сначала берём кандидатов, а сравнение quantity <= threshold
+      // делаем в приложении. Для больших каталогов лучше вынести в raw SQL,
+      // но для MVP объём данных это не оправдывает.
+      const candidates = await this.prisma.product.findMany({ where, include: productInclude })
+      const lowStockItems = candidates.filter(p => p.quantity <= p.lowStockThreshold)
+      const page = query.page ?? 1
+      const limit = query.limit ?? 20
+      const start = (page - 1) * limit
+      return {
+        data: lowStockItems.slice(start, start + limit),
+        meta: {
+          page,
+          limit,
+          total: lowStockItems.length,
+          totalPages: Math.ceil(lowStockItems.length / limit),
+        },
+      }
     }
+
+    return paginate(
+      query,
+      ({ skip, take }) =>
+        this.prisma.product.findMany({ where, include: productInclude, orderBy: { createdAt: 'desc' }, skip, take }),
+      () => this.prisma.product.count({ where }),
+    )
   }
 
   async findOne(id: string, userMarketId?: string) {
@@ -78,9 +84,9 @@ export class ProductsService {
 
     if (file) {
       if (product.image) {
-        this.storageService.delete(product.image)
+        await this.storageService.delete(product.image)
       }
-      data.image = this.storageService.save(file, 'products')
+      data.image = await this.storageService.save(file, 'products')
     }
 
     return this.prisma.product.update({ where: { id }, data, include: productInclude })
@@ -90,7 +96,7 @@ export class ProductsService {
     const product = await this.findOne(id, userMarketId)
 
     if (product.image) {
-      this.storageService.delete(product.image)
+      await this.storageService.delete(product.image)
     }
 
     await this.prisma.product.delete({ where: { id } })
