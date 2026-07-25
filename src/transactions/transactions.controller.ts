@@ -2,6 +2,8 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestj
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger'
 import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import { Roles } from '../auth/decorators/roles.decorator'
+import { Role } from '../enums'
 import { JwtPayload } from '../interfaces'
 import { ApiErrorResponse } from '../common/decorators/api-error-response.decorator'
 import { TransactionsService } from './transactions.service'
@@ -19,6 +21,11 @@ import { PaginatedResult } from '../common/dto/pagination.dto'
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 
+  // Любая роль (ADMIN/OWNER/SELLER) может создавать транзакцию — в том числе
+  // SELLER, но только DEBT-тип имеет для него смысл; полноценная проверка
+  // "SELLER может только DEBT" выполняется в сервисе бизнес-правилами проекта,
+  // здесь ограничиваем именно управляющие операции (удаление, произвольный SALE
+  // остаётся доступен ADMIN/OWNER).
   @Post()
   @ApiCreatedResponse({ type: TransactionResponseDto })
   create(@Body() dto: CreateTransactionDto, @CurrentUser() user: JwtPayload) {
@@ -28,8 +35,8 @@ export class TransactionsController {
   @Get()
   @ApiOkResponse({ type: TransactionResponseDto })
   @ApiQuery({ name: 'debtorId', required: false })
-  @ApiQuery({ name: 'type', required: false, enum: ['SALE', 'DEBT'] })
-  @ApiQuery({ name: 'status', required: false, enum: ['PAID', 'ACTIVE', 'PARTIAL'] })
+  @ApiQuery({ name: 'type', required: false, enum: ['SALE', 'DEBT', 'REFUND'] })
+  @ApiQuery({ name: 'status', required: false, enum: ['PAID', 'ACTIVE', 'PARTIAL', 'REFUNDED'] })
   @ApiQuery({ name: 'dateFrom', required: false })
   @ApiQuery({ name: 'dateTo', required: false })
   @ApiQuery({ name: 'page', required: false, example: 1 })
@@ -40,11 +47,14 @@ export class TransactionsController {
 
   @Get(':id')
   @ApiOkResponse({ type: TransactionResponseDto })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.transactionsService.findOne(id)
+  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+    // ВАЖНО: marketId обязательно передаётся, иначе любой пользователь
+    // может прочитать транзакцию чужого маркета по id (IDOR).
+    return this.transactionsService.findOne(id, user.marketId)
   }
 
   @Patch(':id')
+  @Roles(Role.ADMIN, Role.OWNER)
   @ApiOkResponse({ type: TransactionResponseDto })
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -55,6 +65,7 @@ export class TransactionsController {
   }
 
   @Delete(':id')
+  @Roles(Role.ADMIN, Role.OWNER)
   @ApiOkResponse({ description: 'Transaction deleted' })
   remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
     return this.transactionsService.remove(id, user.marketId)
@@ -68,5 +79,12 @@ export class TransactionsController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.transactionsService.pay(id, dto, user)
+  }
+
+  @Post(':id/refund')
+  @Roles(Role.ADMIN, Role.OWNER)
+  @ApiOkResponse({ type: TransactionResponseDto, description: 'Refund created, stock restored' })
+  refund(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+    return this.transactionsService.refund(id, user)
   }
 }

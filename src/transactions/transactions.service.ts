@@ -5,9 +5,10 @@ import {
 	UnauthorizedException
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { TransactionStatus } from '../enums'
+import { TransactionStatus, TransactionType } from '../enums'
 import { JwtPayload } from '../interfaces'
 import { PaginatedResult } from '../common/dto/pagination.dto'
+import { paginate } from '../common/utils/paginate.util'
 import { CreateTransactionDto } from './dto/create-transaction.dto'
 import { CreatePaymentDto } from './dto/create-payment.dto'
 import { QueryTransactionDto } from './dto/query-transaction.dto'
@@ -39,41 +40,82 @@ export class TransactionsService {
 		if (!marketId)
 			throw new UnauthorizedException('User is not assigned to a market')
 
-		const productIds = dto.items.map(i => i.productId)
-		const products = await this.prisma.product.findMany({
-			where: { id: { in: productIds } },
-			select: { id: true, name: true }
-		})
-		const productMap = new Map(products.map(p => [p.id, p.name]))
+		const productIds = [...new Set(dto.items.map(i => i.productId))]
 
-		const itemsTotal = dto.items.reduce(
-			(sum, item) => sum + item.quantity * item.price,
-			0
-		)
+		return this.prisma.$transaction(async tx => {
+			// Берём товары в рамках маркета пользователя, блокировкой строк через
+			// обычный SELECT (Prisma не даёт FOR UPDATE напрямую) — конкурентные
+			// продажи одного и того же товара обрабатываются через атомарный
+			// decrement ниже с проверкой условия в WHERE.
+			const products = await tx.product.findMany({
+				where: { id: { in: productIds }, marketId }
+			})
 
-		const isDebt = dto.type === 'DEBT'
+			if (products.length !== productIds.length) {
+				throw new BadRequestException(
+					'One or more products were not found in your market'
+				)
+			}
 
-		return this.prisma.transaction.create({
-			data: {
-				marketId,
-				createdById: user.sub,
-				debtorId: dto.debtorId,
-				type: dto.type,
-				paymentType: dto.paymentType,
-				totalAmount: itemsTotal,
-				remainingAmount: isDebt ? itemsTotal : 0,
-				status: isDebt ? TransactionStatus.ACTIVE : TransactionStatus.PAID,
-				items: {
-					create: dto.items.map(item => ({
-						productId: item.productId,
-						productName: productMap.get(item.productId) ?? item.productId,
-						quantity: item.quantity,
-						price: item.price,
-						totalPrice: item.quantity * item.price
-					}))
+			const productMap = new Map(products.map(p => [p.id, p]))
+
+			// Цена и totalPrice всегда считаются от актуальной цены товара в БД,
+			// а не от того, что прислал клиент — иначе можно занизить сумму продажи.
+			let itemsTotal = 0
+			const itemsData = dto.items.map(item => {
+				const product = productMap.get(item.productId)!
+				const discount = item.discount ?? 0
+				const lineTotal = item.quantity * product.price - discount
+				if (lineTotal < 0) {
+					throw new BadRequestException(
+						`Discount exceeds line total for product "${product.name}"`
+					)
 				}
-			},
-			include: transactionInclude
+				itemsTotal += lineTotal
+				return {
+					productId: product.id,
+					productName: product.name,
+					quantity: item.quantity,
+					price: product.price,
+					discount,
+					totalPrice: lineTotal
+				}
+			})
+
+			const isDebt = dto.type === TransactionType.DEBT
+
+			// Проверяем остаток и списываем сток атомарно: decrement только если
+			// quantity >= списываемого количества, иначе запись не обновится и мы
+			// узнаём об этом по count === 0 в результате updateMany.
+			for (const item of dto.items) {
+				const product = productMap.get(item.productId)!
+				const result = await tx.product.updateMany({
+					where: { id: product.id, quantity: { gte: item.quantity } },
+					data: { quantity: { decrement: item.quantity } }
+				})
+				if (result.count === 0) {
+					throw new BadRequestException(
+						`Not enough stock for product "${product.name}"`
+					)
+				}
+			}
+
+			return tx.transaction.create({
+				data: {
+					marketId,
+					createdById: user.sub,
+					debtorId: dto.debtorId,
+					type: dto.type,
+					paymentType: dto.paymentType,
+					totalAmount: itemsTotal,
+					discountAmount: itemsData.reduce((s, i) => s + i.discount, 0),
+					remainingAmount: isDebt ? itemsTotal : 0,
+					status: isDebt ? TransactionStatus.ACTIVE : TransactionStatus.PAID,
+					dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+					items: { create: itemsData }
+				},
+				include: transactionInclude
+			})
 		})
 	}
 
@@ -93,30 +135,18 @@ export class TransactionsService {
 			if (query.dateTo) where.createdAt.lte = new Date(query.dateTo)
 		}
 
-		const page = query.page ?? 1
-		const limit = query.limit ?? 20
-		const skip = (page - 1) * limit
-
-		const [data, total] = await Promise.all([
-			this.prisma.transaction.findMany({
-				where,
-				include: transactionInclude,
-				orderBy: { createdAt: 'desc' },
-				skip,
-				take: limit
-			}),
-			this.prisma.transaction.count({ where })
-		])
-
-		return {
-			data,
-			meta: {
-				page,
-				limit,
-				total,
-				totalPages: Math.ceil(total / limit)
-			}
-		}
+		return paginate(
+			query,
+			({ skip, take }) =>
+				this.prisma.transaction.findMany({
+					where,
+					include: transactionInclude,
+					orderBy: { createdAt: 'desc' },
+					skip,
+					take
+				}),
+			() => this.prisma.transaction.count({ where })
+		)
 	}
 
 	async findOne(id: string, userMarketId?: string) {
@@ -135,7 +165,10 @@ export class TransactionsService {
 		await this.findOne(id, userMarketId)
 		return this.prisma.transaction.update({
 			where: { id },
-			data: dto,
+			data: {
+				...dto,
+				dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined
+			},
 			include: transactionInclude
 		})
 	}
@@ -162,20 +195,39 @@ export class TransactionsService {
 			)
 		}
 
-		const newRemaining = transaction.remainingAmount - dto.amount
-		const newStatus =
-			newRemaining <= 0 ? TransactionStatus.PAID : TransactionStatus.PARTIAL
+		return this.prisma.$transaction(async tx => {
+			// Атомарное списание долга прямо в БД: обновляем, только если
+			// remainingAmount всё ещё не меньше суммы платежа — это защищает
+			// от гонки при двух одновременных платежах по одному долгу
+			// (lost update). Если условие не совпало — кто-то уже успел
+			// провести другой платёж, отдаём понятную ошибку.
+			const candidates = await tx.transaction.findMany({
+				where: { id, remainingAmount: { gte: dto.amount } },
+				select: { remainingAmount: true }
+			})
+			if (candidates.length === 0) {
+				throw new BadRequestException(
+					'Payment amount exceeds the current remaining debt'
+				)
+			}
 
-		const [updated] = await this.prisma.$transaction([
-			this.prisma.transaction.update({
-				where: { id },
-				data: {
-					remainingAmount: newRemaining,
-					status: newStatus
-				},
-				include: transactionInclude
-			}),
-			this.prisma.payment.create({
+			const current = candidates[0].remainingAmount
+			const newRemaining = current - dto.amount
+			const newStatus =
+				newRemaining <= 0 ? TransactionStatus.PAID : TransactionStatus.PARTIAL
+
+			const updateResult = await tx.transaction.updateMany({
+				where: { id, remainingAmount: current },
+				data: { remainingAmount: newRemaining, status: newStatus }
+			})
+
+			if (updateResult.count === 0) {
+				throw new BadRequestException(
+					'Transaction was modified concurrently, please retry'
+				)
+			}
+
+			await tx.payment.create({
 				data: {
 					transactionId: id,
 					amount: dto.amount,
@@ -183,8 +235,77 @@ export class TransactionsService {
 					createdById: user.sub
 				}
 			})
-		])
 
-		return updated
+			return tx.transaction.findUniqueOrThrow({
+				where: { id },
+				include: transactionInclude
+			})
+		})
+	}
+
+	/**
+	 * Возврат продажи: создаёт REFUND-транзакцию, возвращает товар на склад
+	 * и помечает исходную SALE-транзакцию как REFUNDED.
+	 */
+	async refund(id: string, user: JwtPayload) {
+		const marketId = user.marketId
+		if (!marketId)
+			throw new UnauthorizedException('User is not assigned to a market')
+
+		const original = await this.prisma.transaction.findUnique({
+			where: { id },
+			include: { items: true, refund: true }
+		})
+
+		if (!original || original.marketId !== marketId) {
+			throw new NotFoundException('Transaction not found')
+		}
+		if (original.type === TransactionType.REFUND) {
+			throw new BadRequestException('Cannot refund a refund transaction')
+		}
+		if (original.refund) {
+			throw new BadRequestException('Transaction was already refunded')
+		}
+
+		return this.prisma.$transaction(async tx => {
+			for (const item of original.items) {
+				await tx.product.update({
+					where: { id: item.productId },
+					data: { quantity: { increment: item.quantity } }
+				})
+			}
+
+			const refundTx = await tx.transaction.create({
+				data: {
+					marketId,
+					createdById: user.sub,
+					debtorId: original.debtorId,
+					refundOfId: original.id,
+					type: TransactionType.REFUND,
+					paymentType: original.paymentType,
+					totalAmount: original.totalAmount,
+					remainingAmount: 0,
+					status: TransactionStatus.PAID,
+					items: {
+						create: original.items.map(item => ({
+							productId: item.productId,
+							productName: item.productName,
+							quantity: item.quantity,
+							price: item.price,
+							discount: item.discount,
+							totalPrice: item.totalPrice
+						}))
+					}
+				},
+				include: transactionInclude
+			})
+
+			await tx.transaction.update({
+				where: { id: original.id },
+				data: { status: TransactionStatus.REFUNDED }
+			})
+
+			return refundTx
+		})
 	}
 }

@@ -1,5 +1,15 @@
 import { Type } from 'class-transformer'
-import { ArrayMinSize, IsArray, IsEnum, IsNumber, IsOptional, IsUUID, Min, ValidateNested } from 'class-validator'
+import {
+  ArrayMinSize,
+  IsArray,
+  IsDateString,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsUUID,
+  Min,
+  ValidateNested,
+} from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { PaymentType, TransactionType } from '../../enums'
 
@@ -13,10 +23,14 @@ class CreateTransactionItemDto {
   @Min(1)
   quantity: number
 
-  @ApiProperty({ example: 1.5 })
+  @ApiPropertyOptional({
+    example: 0,
+    description: 'Discount for this line item. Price itself is always taken from the product in the database, never from the client.',
+  })
+  @IsOptional()
   @IsNumber()
-  @Min(0.01)
-  price: number
+  @Min(0)
+  discount?: number
 }
 
 export class CreateTransactionDto {
@@ -32,6 +46,11 @@ export class CreateTransactionDto {
   @ApiProperty({ enum: PaymentType, example: PaymentType.CASH })
   @IsEnum(PaymentType)
   paymentType: PaymentType
+
+  @ApiPropertyOptional({ description: 'Due date for a DEBT transaction' })
+  @IsOptional()
+  @IsDateString()
+  dueDate?: string
 
   @ApiProperty({ type: [CreateTransactionItemDto] })
   @IsArray()
