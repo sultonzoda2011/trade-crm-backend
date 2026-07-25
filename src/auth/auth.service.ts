@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
 import { compare } from 'bcrypt'
-import { randomUUID } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import { JwtPayload } from '../interfaces'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuthResponseDto } from './dto/auth-response.dto'
@@ -43,8 +43,10 @@ export class AuthService {
 	}
 
 	async refresh(refreshToken: string): Promise<AuthResponseDto> {
+		const tokenHash = this.hashToken(refreshToken)
+
 		const storedToken = await this.prisma.refreshToken.findUnique({
-			where: { token: refreshToken },
+			where: { token: tokenHash },
 			include: { user: true }
 		})
 
@@ -53,6 +55,12 @@ export class AuthService {
 		}
 
 		if (storedToken.revokedAt) {
+			// Токен уже был использован/отозван, но его снова пытаются применить —
+			// возможный признак кражи токена. Отзываем все refresh-токены пользователя.
+			await this.prisma.refreshToken.updateMany({
+				where: { userId: storedToken.userId, revokedAt: null },
+				data: { revokedAt: new Date() }
+			})
 			throw new UnauthorizedException('Refresh token has been revoked')
 		}
 
@@ -80,8 +88,10 @@ export class AuthService {
 	}
 
 	async logout(refreshToken: string): Promise<void> {
+		const tokenHash = this.hashToken(refreshToken)
+
 		const storedToken = await this.prisma.refreshToken.findUnique({
-			where: { token: refreshToken }
+			where: { token: tokenHash }
 		})
 
 		if (!storedToken || storedToken.revokedAt) {
@@ -133,16 +143,23 @@ export class AuthService {
 	}
 
 	private async createRefreshToken(userId: string): Promise<string> {
+		// Клиенту отдаём случайный токен, а в БД храним только его хеш —
+		// утечка базы не даёт напрямую рабочие refresh-токены.
 		const token = randomUUID()
+		const tokenHash = this.hashToken(token)
 
 		const expiresInMs = this.parseDuration(this.refreshTokenExpiresIn)
 		const expiresAt = new Date(Date.now() + expiresInMs)
 
 		await this.prisma.refreshToken.create({
-			data: { token, userId, expiresAt }
+			data: { token: tokenHash, userId, expiresAt }
 		})
 
 		return token
+	}
+
+	private hashToken(token: string): string {
+		return createHash('sha256').update(token).digest('hex')
 	}
 
 	private parseDuration(duration: string): number {

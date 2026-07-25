@@ -1,4 +1,4 @@
-import { IsEmail, IsString, Matches, MinLength } from 'class-validator'
+import { IsEmail, IsNotEmpty, IsString, MaxLength } from 'class-validator'
 import { ApiProperty } from '@nestjs/swagger'
 
 export class LoginDto {
@@ -8,9 +8,7 @@ export class LoginDto {
 
   @ApiProperty({ example: 'StrongP@ss1' })
   @IsString()
-  @MinLength(8)
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
-    message: 'Password must contain at least one lowercase, one uppercase, and one digit',
-  })
+  @IsNotEmpty()
+  @MaxLength(200)
   password: string
 }
