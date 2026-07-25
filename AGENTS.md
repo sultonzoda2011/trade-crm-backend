@@ -17,7 +17,7 @@ No tests exist (`jest` not even installed). There is no lint or typecheck script
 ## Prisma v7 + Postgres adapter
 
 - Prisma client is generated to `prisma/generated/client` (not `node_modules/.prisma`).
-- Import from `prisma/generated/client` (not `@prisma/client`).
+- Import from `../../prisma/generated/client` (relative path, not `@prisma/client`).
 - `PrismaService` uses `@prisma/adapter-pg` — the adapter is constructed with the raw `DATABASE_URL` env var, not via PrismaClient's `datasources`.
 - DB config: `prisma.config.ts` (Prisma v7 config file format, not `prisma/schema.prisma` for datasource URLs).
 - Migrations: `prisma/migrations/`.
