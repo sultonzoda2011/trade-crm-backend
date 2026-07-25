@@ -20,7 +20,8 @@ export type Role = (typeof Role)[keyof typeof Role]
 
 export const TransactionType = {
   SALE: 'SALE',
-  DEBT: 'DEBT'
+  DEBT: 'DEBT',
+  REFUND: 'REFUND'
 } as const
 
 export type TransactionType = (typeof TransactionType)[keyof typeof TransactionType]
@@ -38,7 +39,19 @@ export type PaymentType = (typeof PaymentType)[keyof typeof PaymentType]
 export const TransactionStatus = {
   PAID: 'PAID',
   ACTIVE: 'ACTIVE',
-  PARTIAL: 'PARTIAL'
+  PARTIAL: 'PARTIAL',
+  REFUNDED: 'REFUNDED'
 } as const
 
 export type TransactionStatus = (typeof TransactionStatus)[keyof typeof TransactionStatus]
+
+
+export const ProductUnit = {
+  PCS: 'PCS',
+  KG: 'KG',
+  L: 'L',
+  M: 'M',
+  BOX: 'BOX'
+} as const
+
+export type ProductUnit = (typeof ProductUnit)[keyof typeof ProductUnit]

@@ -11,6 +11,7 @@
 export type * from './models/User'
 export type * from './models/RefreshToken'
 export type * from './models/Market'
+export type * from './models/Category'
 export type * from './models/Product'
 export type * from './models/Debtor'
 export type * from './models/Transaction'

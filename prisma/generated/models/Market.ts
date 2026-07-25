@@ -201,6 +201,7 @@ export type MarketWhereInput = {
   owner?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   debtors?: Prisma.DebtorListRelationFilter
   products?: Prisma.ProductListRelationFilter
+  categories?: Prisma.CategoryListRelationFilter
   transactions?: Prisma.TransactionListRelationFilter
   users?: Prisma.UserListRelationFilter
 }
@@ -216,6 +217,7 @@ export type MarketOrderByWithRelationInput = {
   owner?: Prisma.UserOrderByWithRelationInput
   debtors?: Prisma.DebtorOrderByRelationAggregateInput
   products?: Prisma.ProductOrderByRelationAggregateInput
+  categories?: Prisma.CategoryOrderByRelationAggregateInput
   transactions?: Prisma.TransactionOrderByRelationAggregateInput
   users?: Prisma.UserOrderByRelationAggregateInput
 }
@@ -234,6 +236,7 @@ export type MarketWhereUniqueInput = Prisma.AtLeast<{
   owner?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   debtors?: Prisma.DebtorListRelationFilter
   products?: Prisma.ProductListRelationFilter
+  categories?: Prisma.CategoryListRelationFilter
   transactions?: Prisma.TransactionListRelationFilter
   users?: Prisma.UserListRelationFilter
 }, "id">
@@ -274,6 +277,7 @@ export type MarketCreateInput = {
   owner: Prisma.UserCreateNestedOneWithoutOwnedMarketsInput
   debtors?: Prisma.DebtorCreateNestedManyWithoutMarketInput
   products?: Prisma.ProductCreateNestedManyWithoutMarketInput
+  categories?: Prisma.CategoryCreateNestedManyWithoutMarketInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutMarketInput
   users?: Prisma.UserCreateNestedManyWithoutMarketInput
 }
@@ -288,6 +292,7 @@ export type MarketUncheckedCreateInput = {
   updatedAt?: Date | string
   debtors?: Prisma.DebtorUncheckedCreateNestedManyWithoutMarketInput
   products?: Prisma.ProductUncheckedCreateNestedManyWithoutMarketInput
+  categories?: Prisma.CategoryUncheckedCreateNestedManyWithoutMarketInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutMarketInput
   users?: Prisma.UserUncheckedCreateNestedManyWithoutMarketInput
 }
@@ -302,6 +307,7 @@ export type MarketUpdateInput = {
   owner?: Prisma.UserUpdateOneRequiredWithoutOwnedMarketsNestedInput
   debtors?: Prisma.DebtorUpdateManyWithoutMarketNestedInput
   products?: Prisma.ProductUpdateManyWithoutMarketNestedInput
+  categories?: Prisma.CategoryUpdateManyWithoutMarketNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutMarketNestedInput
   users?: Prisma.UserUpdateManyWithoutMarketNestedInput
 }
@@ -316,6 +322,7 @@ export type MarketUncheckedUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   debtors?: Prisma.DebtorUncheckedUpdateManyWithoutMarketNestedInput
   products?: Prisma.ProductUncheckedUpdateManyWithoutMarketNestedInput
+  categories?: Prisma.CategoryUncheckedUpdateManyWithoutMarketNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutMarketNestedInput
   users?: Prisma.UserUncheckedUpdateManyWithoutMarketNestedInput
 }
@@ -457,6 +464,20 @@ export type MarketUncheckedUpdateManyWithoutOwnerNestedInput = {
   deleteMany?: Prisma.MarketScalarWhereInput | Prisma.MarketScalarWhereInput[]
 }
 
+export type MarketCreateNestedOneWithoutCategoriesInput = {
+  create?: Prisma.XOR<Prisma.MarketCreateWithoutCategoriesInput, Prisma.MarketUncheckedCreateWithoutCategoriesInput>
+  connectOrCreate?: Prisma.MarketCreateOrConnectWithoutCategoriesInput
+  connect?: Prisma.MarketWhereUniqueInput
+}
+
+export type MarketUpdateOneRequiredWithoutCategoriesNestedInput = {
+  create?: Prisma.XOR<Prisma.MarketCreateWithoutCategoriesInput, Prisma.MarketUncheckedCreateWithoutCategoriesInput>
+  connectOrCreate?: Prisma.MarketCreateOrConnectWithoutCategoriesInput
+  upsert?: Prisma.MarketUpsertWithoutCategoriesInput
+  connect?: Prisma.MarketWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.MarketUpdateToOneWithWhereWithoutCategoriesInput, Prisma.MarketUpdateWithoutCategoriesInput>, Prisma.MarketUncheckedUpdateWithoutCategoriesInput>
+}
+
 export type MarketCreateNestedOneWithoutProductsInput = {
   create?: Prisma.XOR<Prisma.MarketCreateWithoutProductsInput, Prisma.MarketUncheckedCreateWithoutProductsInput>
   connectOrCreate?: Prisma.MarketCreateOrConnectWithoutProductsInput
@@ -509,6 +530,7 @@ export type MarketCreateWithoutUsersInput = {
   owner: Prisma.UserCreateNestedOneWithoutOwnedMarketsInput
   debtors?: Prisma.DebtorCreateNestedManyWithoutMarketInput
   products?: Prisma.ProductCreateNestedManyWithoutMarketInput
+  categories?: Prisma.CategoryCreateNestedManyWithoutMarketInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutMarketInput
 }
 
@@ -522,6 +544,7 @@ export type MarketUncheckedCreateWithoutUsersInput = {
   updatedAt?: Date | string
   debtors?: Prisma.DebtorUncheckedCreateNestedManyWithoutMarketInput
   products?: Prisma.ProductUncheckedCreateNestedManyWithoutMarketInput
+  categories?: Prisma.CategoryUncheckedCreateNestedManyWithoutMarketInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutMarketInput
 }
 
@@ -539,6 +562,7 @@ export type MarketCreateWithoutOwnerInput = {
   updatedAt?: Date | string
   debtors?: Prisma.DebtorCreateNestedManyWithoutMarketInput
   products?: Prisma.ProductCreateNestedManyWithoutMarketInput
+  categories?: Prisma.CategoryCreateNestedManyWithoutMarketInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutMarketInput
   users?: Prisma.UserCreateNestedManyWithoutMarketInput
 }
@@ -552,6 +576,7 @@ export type MarketUncheckedCreateWithoutOwnerInput = {
   updatedAt?: Date | string
   debtors?: Prisma.DebtorUncheckedCreateNestedManyWithoutMarketInput
   products?: Prisma.ProductUncheckedCreateNestedManyWithoutMarketInput
+  categories?: Prisma.CategoryUncheckedCreateNestedManyWithoutMarketInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutMarketInput
   users?: Prisma.UserUncheckedCreateNestedManyWithoutMarketInput
 }
@@ -587,6 +612,7 @@ export type MarketUpdateWithoutUsersInput = {
   owner?: Prisma.UserUpdateOneRequiredWithoutOwnedMarketsNestedInput
   debtors?: Prisma.DebtorUpdateManyWithoutMarketNestedInput
   products?: Prisma.ProductUpdateManyWithoutMarketNestedInput
+  categories?: Prisma.CategoryUpdateManyWithoutMarketNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutMarketNestedInput
 }
 
@@ -600,6 +626,7 @@ export type MarketUncheckedUpdateWithoutUsersInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   debtors?: Prisma.DebtorUncheckedUpdateManyWithoutMarketNestedInput
   products?: Prisma.ProductUncheckedUpdateManyWithoutMarketNestedInput
+  categories?: Prisma.CategoryUncheckedUpdateManyWithoutMarketNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutMarketNestedInput
 }
 
@@ -632,6 +659,78 @@ export type MarketScalarWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"Market"> | Date | string
 }
 
+export type MarketCreateWithoutCategoriesInput = {
+  id?: string
+  name: string
+  address: string
+  image?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  owner: Prisma.UserCreateNestedOneWithoutOwnedMarketsInput
+  debtors?: Prisma.DebtorCreateNestedManyWithoutMarketInput
+  products?: Prisma.ProductCreateNestedManyWithoutMarketInput
+  transactions?: Prisma.TransactionCreateNestedManyWithoutMarketInput
+  users?: Prisma.UserCreateNestedManyWithoutMarketInput
+}
+
+export type MarketUncheckedCreateWithoutCategoriesInput = {
+  id?: string
+  name: string
+  address: string
+  image?: string | null
+  ownerId: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  debtors?: Prisma.DebtorUncheckedCreateNestedManyWithoutMarketInput
+  products?: Prisma.ProductUncheckedCreateNestedManyWithoutMarketInput
+  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutMarketInput
+  users?: Prisma.UserUncheckedCreateNestedManyWithoutMarketInput
+}
+
+export type MarketCreateOrConnectWithoutCategoriesInput = {
+  where: Prisma.MarketWhereUniqueInput
+  create: Prisma.XOR<Prisma.MarketCreateWithoutCategoriesInput, Prisma.MarketUncheckedCreateWithoutCategoriesInput>
+}
+
+export type MarketUpsertWithoutCategoriesInput = {
+  update: Prisma.XOR<Prisma.MarketUpdateWithoutCategoriesInput, Prisma.MarketUncheckedUpdateWithoutCategoriesInput>
+  create: Prisma.XOR<Prisma.MarketCreateWithoutCategoriesInput, Prisma.MarketUncheckedCreateWithoutCategoriesInput>
+  where?: Prisma.MarketWhereInput
+}
+
+export type MarketUpdateToOneWithWhereWithoutCategoriesInput = {
+  where?: Prisma.MarketWhereInput
+  data: Prisma.XOR<Prisma.MarketUpdateWithoutCategoriesInput, Prisma.MarketUncheckedUpdateWithoutCategoriesInput>
+}
+
+export type MarketUpdateWithoutCategoriesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  address?: Prisma.StringFieldUpdateOperationsInput | string
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  owner?: Prisma.UserUpdateOneRequiredWithoutOwnedMarketsNestedInput
+  debtors?: Prisma.DebtorUpdateManyWithoutMarketNestedInput
+  products?: Prisma.ProductUpdateManyWithoutMarketNestedInput
+  transactions?: Prisma.TransactionUpdateManyWithoutMarketNestedInput
+  users?: Prisma.UserUpdateManyWithoutMarketNestedInput
+}
+
+export type MarketUncheckedUpdateWithoutCategoriesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  address?: Prisma.StringFieldUpdateOperationsInput | string
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownerId?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  debtors?: Prisma.DebtorUncheckedUpdateManyWithoutMarketNestedInput
+  products?: Prisma.ProductUncheckedUpdateManyWithoutMarketNestedInput
+  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutMarketNestedInput
+  users?: Prisma.UserUncheckedUpdateManyWithoutMarketNestedInput
+}
+
 export type MarketCreateWithoutProductsInput = {
   id?: string
   name: string
@@ -641,6 +740,7 @@ export type MarketCreateWithoutProductsInput = {
   updatedAt?: Date | string
   owner: Prisma.UserCreateNestedOneWithoutOwnedMarketsInput
   debtors?: Prisma.DebtorCreateNestedManyWithoutMarketInput
+  categories?: Prisma.CategoryCreateNestedManyWithoutMarketInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutMarketInput
   users?: Prisma.UserCreateNestedManyWithoutMarketInput
 }
@@ -654,6 +754,7 @@ export type MarketUncheckedCreateWithoutProductsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   debtors?: Prisma.DebtorUncheckedCreateNestedManyWithoutMarketInput
+  categories?: Prisma.CategoryUncheckedCreateNestedManyWithoutMarketInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutMarketInput
   users?: Prisma.UserUncheckedCreateNestedManyWithoutMarketInput
 }
@@ -683,6 +784,7 @@ export type MarketUpdateWithoutProductsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   owner?: Prisma.UserUpdateOneRequiredWithoutOwnedMarketsNestedInput
   debtors?: Prisma.DebtorUpdateManyWithoutMarketNestedInput
+  categories?: Prisma.CategoryUpdateManyWithoutMarketNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutMarketNestedInput
   users?: Prisma.UserUpdateManyWithoutMarketNestedInput
 }
@@ -696,6 +798,7 @@ export type MarketUncheckedUpdateWithoutProductsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   debtors?: Prisma.DebtorUncheckedUpdateManyWithoutMarketNestedInput
+  categories?: Prisma.CategoryUncheckedUpdateManyWithoutMarketNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutMarketNestedInput
   users?: Prisma.UserUncheckedUpdateManyWithoutMarketNestedInput
 }
@@ -709,6 +812,7 @@ export type MarketCreateWithoutDebtorsInput = {
   updatedAt?: Date | string
   owner: Prisma.UserCreateNestedOneWithoutOwnedMarketsInput
   products?: Prisma.ProductCreateNestedManyWithoutMarketInput
+  categories?: Prisma.CategoryCreateNestedManyWithoutMarketInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutMarketInput
   users?: Prisma.UserCreateNestedManyWithoutMarketInput
 }
@@ -722,6 +826,7 @@ export type MarketUncheckedCreateWithoutDebtorsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   products?: Prisma.ProductUncheckedCreateNestedManyWithoutMarketInput
+  categories?: Prisma.CategoryUncheckedCreateNestedManyWithoutMarketInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutMarketInput
   users?: Prisma.UserUncheckedCreateNestedManyWithoutMarketInput
 }
@@ -751,6 +856,7 @@ export type MarketUpdateWithoutDebtorsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   owner?: Prisma.UserUpdateOneRequiredWithoutOwnedMarketsNestedInput
   products?: Prisma.ProductUpdateManyWithoutMarketNestedInput
+  categories?: Prisma.CategoryUpdateManyWithoutMarketNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutMarketNestedInput
   users?: Prisma.UserUpdateManyWithoutMarketNestedInput
 }
@@ -764,6 +870,7 @@ export type MarketUncheckedUpdateWithoutDebtorsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   products?: Prisma.ProductUncheckedUpdateManyWithoutMarketNestedInput
+  categories?: Prisma.CategoryUncheckedUpdateManyWithoutMarketNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutMarketNestedInput
   users?: Prisma.UserUncheckedUpdateManyWithoutMarketNestedInput
 }
@@ -778,6 +885,7 @@ export type MarketCreateWithoutTransactionsInput = {
   owner: Prisma.UserCreateNestedOneWithoutOwnedMarketsInput
   debtors?: Prisma.DebtorCreateNestedManyWithoutMarketInput
   products?: Prisma.ProductCreateNestedManyWithoutMarketInput
+  categories?: Prisma.CategoryCreateNestedManyWithoutMarketInput
   users?: Prisma.UserCreateNestedManyWithoutMarketInput
 }
 
@@ -791,6 +899,7 @@ export type MarketUncheckedCreateWithoutTransactionsInput = {
   updatedAt?: Date | string
   debtors?: Prisma.DebtorUncheckedCreateNestedManyWithoutMarketInput
   products?: Prisma.ProductUncheckedCreateNestedManyWithoutMarketInput
+  categories?: Prisma.CategoryUncheckedCreateNestedManyWithoutMarketInput
   users?: Prisma.UserUncheckedCreateNestedManyWithoutMarketInput
 }
 
@@ -820,6 +929,7 @@ export type MarketUpdateWithoutTransactionsInput = {
   owner?: Prisma.UserUpdateOneRequiredWithoutOwnedMarketsNestedInput
   debtors?: Prisma.DebtorUpdateManyWithoutMarketNestedInput
   products?: Prisma.ProductUpdateManyWithoutMarketNestedInput
+  categories?: Prisma.CategoryUpdateManyWithoutMarketNestedInput
   users?: Prisma.UserUpdateManyWithoutMarketNestedInput
 }
 
@@ -833,6 +943,7 @@ export type MarketUncheckedUpdateWithoutTransactionsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   debtors?: Prisma.DebtorUncheckedUpdateManyWithoutMarketNestedInput
   products?: Prisma.ProductUncheckedUpdateManyWithoutMarketNestedInput
+  categories?: Prisma.CategoryUncheckedUpdateManyWithoutMarketNestedInput
   users?: Prisma.UserUncheckedUpdateManyWithoutMarketNestedInput
 }
 
@@ -854,6 +965,7 @@ export type MarketUpdateWithoutOwnerInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   debtors?: Prisma.DebtorUpdateManyWithoutMarketNestedInput
   products?: Prisma.ProductUpdateManyWithoutMarketNestedInput
+  categories?: Prisma.CategoryUpdateManyWithoutMarketNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutMarketNestedInput
   users?: Prisma.UserUpdateManyWithoutMarketNestedInput
 }
@@ -867,6 +979,7 @@ export type MarketUncheckedUpdateWithoutOwnerInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   debtors?: Prisma.DebtorUncheckedUpdateManyWithoutMarketNestedInput
   products?: Prisma.ProductUncheckedUpdateManyWithoutMarketNestedInput
+  categories?: Prisma.CategoryUncheckedUpdateManyWithoutMarketNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutMarketNestedInput
   users?: Prisma.UserUncheckedUpdateManyWithoutMarketNestedInput
 }
@@ -888,6 +1001,7 @@ export type MarketUncheckedUpdateManyWithoutOwnerInput = {
 export type MarketCountOutputType = {
   debtors: number
   products: number
+  categories: number
   transactions: number
   users: number
 }
@@ -895,6 +1009,7 @@ export type MarketCountOutputType = {
 export type MarketCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   debtors?: boolean | MarketCountOutputTypeCountDebtorsArgs
   products?: boolean | MarketCountOutputTypeCountProductsArgs
+  categories?: boolean | MarketCountOutputTypeCountCategoriesArgs
   transactions?: boolean | MarketCountOutputTypeCountTransactionsArgs
   users?: boolean | MarketCountOutputTypeCountUsersArgs
 }
@@ -926,6 +1041,13 @@ export type MarketCountOutputTypeCountProductsArgs<ExtArgs extends runtime.Types
 /**
  * MarketCountOutputType without action
  */
+export type MarketCountOutputTypeCountCategoriesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CategoryWhereInput
+}
+
+/**
+ * MarketCountOutputType without action
+ */
 export type MarketCountOutputTypeCountTransactionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.TransactionWhereInput
 }
@@ -949,6 +1071,7 @@ export type MarketSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   owner?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   debtors?: boolean | Prisma.Market$debtorsArgs<ExtArgs>
   products?: boolean | Prisma.Market$productsArgs<ExtArgs>
+  categories?: boolean | Prisma.Market$categoriesArgs<ExtArgs>
   transactions?: boolean | Prisma.Market$transactionsArgs<ExtArgs>
   users?: boolean | Prisma.Market$usersArgs<ExtArgs>
   _count?: boolean | Prisma.MarketCountOutputTypeDefaultArgs<ExtArgs>
@@ -991,6 +1114,7 @@ export type MarketInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   owner?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   debtors?: boolean | Prisma.Market$debtorsArgs<ExtArgs>
   products?: boolean | Prisma.Market$productsArgs<ExtArgs>
+  categories?: boolean | Prisma.Market$categoriesArgs<ExtArgs>
   transactions?: boolean | Prisma.Market$transactionsArgs<ExtArgs>
   users?: boolean | Prisma.Market$usersArgs<ExtArgs>
   _count?: boolean | Prisma.MarketCountOutputTypeDefaultArgs<ExtArgs>
@@ -1008,6 +1132,7 @@ export type $MarketPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     owner: Prisma.$UserPayload<ExtArgs>
     debtors: Prisma.$DebtorPayload<ExtArgs>[]
     products: Prisma.$ProductPayload<ExtArgs>[]
+    categories: Prisma.$CategoryPayload<ExtArgs>[]
     transactions: Prisma.$TransactionPayload<ExtArgs>[]
     users: Prisma.$UserPayload<ExtArgs>[]
   }
@@ -1416,6 +1541,7 @@ export interface Prisma__MarketClient<T, Null = never, ExtArgs extends runtime.T
   owner<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   debtors<T extends Prisma.Market$debtorsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Market$debtorsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DebtorPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   products<T extends Prisma.Market$productsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Market$productsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProductPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  categories<T extends Prisma.Market$categoriesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Market$categoriesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CategoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   transactions<T extends Prisma.Market$transactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Market$transactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   users<T extends Prisma.Market$usersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Market$usersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
@@ -1900,6 +2026,30 @@ export type Market$productsArgs<ExtArgs extends runtime.Types.Extensions.Interna
   take?: number
   skip?: number
   distinct?: Prisma.ProductScalarFieldEnum | Prisma.ProductScalarFieldEnum[]
+}
+
+/**
+ * Market.categories
+ */
+export type Market$categoriesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Category
+   */
+  select?: Prisma.CategorySelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Category
+   */
+  omit?: Prisma.CategoryOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CategoryInclude<ExtArgs> | null
+  where?: Prisma.CategoryWhereInput
+  orderBy?: Prisma.CategoryOrderByWithRelationInput | Prisma.CategoryOrderByWithRelationInput[]
+  cursor?: Prisma.CategoryWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CategoryScalarFieldEnum | Prisma.CategoryScalarFieldEnum[]
 }
 
 /**

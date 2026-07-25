@@ -29,12 +29,14 @@ export type AggregateTransactionItem = {
 export type TransactionItemAvgAggregateOutputType = {
   quantity: number | null
   price: number | null
+  discount: number | null
   totalPrice: number | null
 }
 
 export type TransactionItemSumAggregateOutputType = {
   quantity: number | null
   price: number | null
+  discount: number | null
   totalPrice: number | null
 }
 
@@ -45,6 +47,7 @@ export type TransactionItemMinAggregateOutputType = {
   productName: string | null
   quantity: number | null
   price: number | null
+  discount: number | null
   totalPrice: number | null
 }
 
@@ -55,6 +58,7 @@ export type TransactionItemMaxAggregateOutputType = {
   productName: string | null
   quantity: number | null
   price: number | null
+  discount: number | null
   totalPrice: number | null
 }
 
@@ -65,6 +69,7 @@ export type TransactionItemCountAggregateOutputType = {
   productName: number
   quantity: number
   price: number
+  discount: number
   totalPrice: number
   _all: number
 }
@@ -73,12 +78,14 @@ export type TransactionItemCountAggregateOutputType = {
 export type TransactionItemAvgAggregateInputType = {
   quantity?: true
   price?: true
+  discount?: true
   totalPrice?: true
 }
 
 export type TransactionItemSumAggregateInputType = {
   quantity?: true
   price?: true
+  discount?: true
   totalPrice?: true
 }
 
@@ -89,6 +96,7 @@ export type TransactionItemMinAggregateInputType = {
   productName?: true
   quantity?: true
   price?: true
+  discount?: true
   totalPrice?: true
 }
 
@@ -99,6 +107,7 @@ export type TransactionItemMaxAggregateInputType = {
   productName?: true
   quantity?: true
   price?: true
+  discount?: true
   totalPrice?: true
 }
 
@@ -109,6 +118,7 @@ export type TransactionItemCountAggregateInputType = {
   productName?: true
   quantity?: true
   price?: true
+  discount?: true
   totalPrice?: true
   _all?: true
 }
@@ -206,6 +216,7 @@ export type TransactionItemGroupByOutputType = {
   productName: string
   quantity: number
   price: number
+  discount: number
   totalPrice: number
   _count: TransactionItemCountAggregateOutputType | null
   _avg: TransactionItemAvgAggregateOutputType | null
@@ -239,6 +250,7 @@ export type TransactionItemWhereInput = {
   productName?: Prisma.StringFilter<"TransactionItem"> | string
   quantity?: Prisma.IntFilter<"TransactionItem"> | number
   price?: Prisma.FloatFilter<"TransactionItem"> | number
+  discount?: Prisma.FloatFilter<"TransactionItem"> | number
   totalPrice?: Prisma.FloatFilter<"TransactionItem"> | number
   product?: Prisma.XOR<Prisma.ProductScalarRelationFilter, Prisma.ProductWhereInput>
   transaction?: Prisma.XOR<Prisma.TransactionScalarRelationFilter, Prisma.TransactionWhereInput>
@@ -251,6 +263,7 @@ export type TransactionItemOrderByWithRelationInput = {
   productName?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   price?: Prisma.SortOrder
+  discount?: Prisma.SortOrder
   totalPrice?: Prisma.SortOrder
   product?: Prisma.ProductOrderByWithRelationInput
   transaction?: Prisma.TransactionOrderByWithRelationInput
@@ -266,6 +279,7 @@ export type TransactionItemWhereUniqueInput = Prisma.AtLeast<{
   productName?: Prisma.StringFilter<"TransactionItem"> | string
   quantity?: Prisma.IntFilter<"TransactionItem"> | number
   price?: Prisma.FloatFilter<"TransactionItem"> | number
+  discount?: Prisma.FloatFilter<"TransactionItem"> | number
   totalPrice?: Prisma.FloatFilter<"TransactionItem"> | number
   product?: Prisma.XOR<Prisma.ProductScalarRelationFilter, Prisma.ProductWhereInput>
   transaction?: Prisma.XOR<Prisma.TransactionScalarRelationFilter, Prisma.TransactionWhereInput>
@@ -278,6 +292,7 @@ export type TransactionItemOrderByWithAggregationInput = {
   productName?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   price?: Prisma.SortOrder
+  discount?: Prisma.SortOrder
   totalPrice?: Prisma.SortOrder
   _count?: Prisma.TransactionItemCountOrderByAggregateInput
   _avg?: Prisma.TransactionItemAvgOrderByAggregateInput
@@ -296,6 +311,7 @@ export type TransactionItemScalarWhereWithAggregatesInput = {
   productName?: Prisma.StringWithAggregatesFilter<"TransactionItem"> | string
   quantity?: Prisma.IntWithAggregatesFilter<"TransactionItem"> | number
   price?: Prisma.FloatWithAggregatesFilter<"TransactionItem"> | number
+  discount?: Prisma.FloatWithAggregatesFilter<"TransactionItem"> | number
   totalPrice?: Prisma.FloatWithAggregatesFilter<"TransactionItem"> | number
 }
 
@@ -304,6 +320,7 @@ export type TransactionItemCreateInput = {
   productName: string
   quantity: number
   price: number
+  discount?: number
   totalPrice: number
   product: Prisma.ProductCreateNestedOneWithoutTransactionItemsInput
   transaction: Prisma.TransactionCreateNestedOneWithoutItemsInput
@@ -316,6 +333,7 @@ export type TransactionItemUncheckedCreateInput = {
   productName: string
   quantity: number
   price: number
+  discount?: number
   totalPrice: number
 }
 
@@ -324,6 +342,7 @@ export type TransactionItemUpdateInput = {
   productName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   price?: Prisma.FloatFieldUpdateOperationsInput | number
+  discount?: Prisma.FloatFieldUpdateOperationsInput | number
   totalPrice?: Prisma.FloatFieldUpdateOperationsInput | number
   product?: Prisma.ProductUpdateOneRequiredWithoutTransactionItemsNestedInput
   transaction?: Prisma.TransactionUpdateOneRequiredWithoutItemsNestedInput
@@ -336,6 +355,7 @@ export type TransactionItemUncheckedUpdateInput = {
   productName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   price?: Prisma.FloatFieldUpdateOperationsInput | number
+  discount?: Prisma.FloatFieldUpdateOperationsInput | number
   totalPrice?: Prisma.FloatFieldUpdateOperationsInput | number
 }
 
@@ -346,6 +366,7 @@ export type TransactionItemCreateManyInput = {
   productName: string
   quantity: number
   price: number
+  discount?: number
   totalPrice: number
 }
 
@@ -354,6 +375,7 @@ export type TransactionItemUpdateManyMutationInput = {
   productName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   price?: Prisma.FloatFieldUpdateOperationsInput | number
+  discount?: Prisma.FloatFieldUpdateOperationsInput | number
   totalPrice?: Prisma.FloatFieldUpdateOperationsInput | number
 }
 
@@ -364,6 +386,7 @@ export type TransactionItemUncheckedUpdateManyInput = {
   productName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   price?: Prisma.FloatFieldUpdateOperationsInput | number
+  discount?: Prisma.FloatFieldUpdateOperationsInput | number
   totalPrice?: Prisma.FloatFieldUpdateOperationsInput | number
 }
 
@@ -384,12 +407,14 @@ export type TransactionItemCountOrderByAggregateInput = {
   productName?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   price?: Prisma.SortOrder
+  discount?: Prisma.SortOrder
   totalPrice?: Prisma.SortOrder
 }
 
 export type TransactionItemAvgOrderByAggregateInput = {
   quantity?: Prisma.SortOrder
   price?: Prisma.SortOrder
+  discount?: Prisma.SortOrder
   totalPrice?: Prisma.SortOrder
 }
 
@@ -400,6 +425,7 @@ export type TransactionItemMaxOrderByAggregateInput = {
   productName?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   price?: Prisma.SortOrder
+  discount?: Prisma.SortOrder
   totalPrice?: Prisma.SortOrder
 }
 
@@ -410,12 +436,14 @@ export type TransactionItemMinOrderByAggregateInput = {
   productName?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   price?: Prisma.SortOrder
+  discount?: Prisma.SortOrder
   totalPrice?: Prisma.SortOrder
 }
 
 export type TransactionItemSumOrderByAggregateInput = {
   quantity?: Prisma.SortOrder
   price?: Prisma.SortOrder
+  discount?: Prisma.SortOrder
   totalPrice?: Prisma.SortOrder
 }
 
@@ -508,6 +536,7 @@ export type TransactionItemCreateWithoutProductInput = {
   productName: string
   quantity: number
   price: number
+  discount?: number
   totalPrice: number
   transaction: Prisma.TransactionCreateNestedOneWithoutItemsInput
 }
@@ -518,6 +547,7 @@ export type TransactionItemUncheckedCreateWithoutProductInput = {
   productName: string
   quantity: number
   price: number
+  discount?: number
   totalPrice: number
 }
 
@@ -557,6 +587,7 @@ export type TransactionItemScalarWhereInput = {
   productName?: Prisma.StringFilter<"TransactionItem"> | string
   quantity?: Prisma.IntFilter<"TransactionItem"> | number
   price?: Prisma.FloatFilter<"TransactionItem"> | number
+  discount?: Prisma.FloatFilter<"TransactionItem"> | number
   totalPrice?: Prisma.FloatFilter<"TransactionItem"> | number
 }
 
@@ -565,6 +596,7 @@ export type TransactionItemCreateWithoutTransactionInput = {
   productName: string
   quantity: number
   price: number
+  discount?: number
   totalPrice: number
   product: Prisma.ProductCreateNestedOneWithoutTransactionItemsInput
 }
@@ -575,6 +607,7 @@ export type TransactionItemUncheckedCreateWithoutTransactionInput = {
   productName: string
   quantity: number
   price: number
+  discount?: number
   totalPrice: number
 }
 
@@ -610,6 +643,7 @@ export type TransactionItemCreateManyProductInput = {
   productName: string
   quantity: number
   price: number
+  discount?: number
   totalPrice: number
 }
 
@@ -618,6 +652,7 @@ export type TransactionItemUpdateWithoutProductInput = {
   productName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   price?: Prisma.FloatFieldUpdateOperationsInput | number
+  discount?: Prisma.FloatFieldUpdateOperationsInput | number
   totalPrice?: Prisma.FloatFieldUpdateOperationsInput | number
   transaction?: Prisma.TransactionUpdateOneRequiredWithoutItemsNestedInput
 }
@@ -628,6 +663,7 @@ export type TransactionItemUncheckedUpdateWithoutProductInput = {
   productName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   price?: Prisma.FloatFieldUpdateOperationsInput | number
+  discount?: Prisma.FloatFieldUpdateOperationsInput | number
   totalPrice?: Prisma.FloatFieldUpdateOperationsInput | number
 }
 
@@ -637,6 +673,7 @@ export type TransactionItemUncheckedUpdateManyWithoutProductInput = {
   productName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   price?: Prisma.FloatFieldUpdateOperationsInput | number
+  discount?: Prisma.FloatFieldUpdateOperationsInput | number
   totalPrice?: Prisma.FloatFieldUpdateOperationsInput | number
 }
 
@@ -646,6 +683,7 @@ export type TransactionItemCreateManyTransactionInput = {
   productName: string
   quantity: number
   price: number
+  discount?: number
   totalPrice: number
 }
 
@@ -654,6 +692,7 @@ export type TransactionItemUpdateWithoutTransactionInput = {
   productName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   price?: Prisma.FloatFieldUpdateOperationsInput | number
+  discount?: Prisma.FloatFieldUpdateOperationsInput | number
   totalPrice?: Prisma.FloatFieldUpdateOperationsInput | number
   product?: Prisma.ProductUpdateOneRequiredWithoutTransactionItemsNestedInput
 }
@@ -664,6 +703,7 @@ export type TransactionItemUncheckedUpdateWithoutTransactionInput = {
   productName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   price?: Prisma.FloatFieldUpdateOperationsInput | number
+  discount?: Prisma.FloatFieldUpdateOperationsInput | number
   totalPrice?: Prisma.FloatFieldUpdateOperationsInput | number
 }
 
@@ -673,6 +713,7 @@ export type TransactionItemUncheckedUpdateManyWithoutTransactionInput = {
   productName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   price?: Prisma.FloatFieldUpdateOperationsInput | number
+  discount?: Prisma.FloatFieldUpdateOperationsInput | number
   totalPrice?: Prisma.FloatFieldUpdateOperationsInput | number
 }
 
@@ -685,6 +726,7 @@ export type TransactionItemSelect<ExtArgs extends runtime.Types.Extensions.Inter
   productName?: boolean
   quantity?: boolean
   price?: boolean
+  discount?: boolean
   totalPrice?: boolean
   product?: boolean | Prisma.ProductDefaultArgs<ExtArgs>
   transaction?: boolean | Prisma.TransactionDefaultArgs<ExtArgs>
@@ -697,6 +739,7 @@ export type TransactionItemSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
   productName?: boolean
   quantity?: boolean
   price?: boolean
+  discount?: boolean
   totalPrice?: boolean
   product?: boolean | Prisma.ProductDefaultArgs<ExtArgs>
   transaction?: boolean | Prisma.TransactionDefaultArgs<ExtArgs>
@@ -709,6 +752,7 @@ export type TransactionItemSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
   productName?: boolean
   quantity?: boolean
   price?: boolean
+  discount?: boolean
   totalPrice?: boolean
   product?: boolean | Prisma.ProductDefaultArgs<ExtArgs>
   transaction?: boolean | Prisma.TransactionDefaultArgs<ExtArgs>
@@ -721,10 +765,11 @@ export type TransactionItemSelectScalar = {
   productName?: boolean
   quantity?: boolean
   price?: boolean
+  discount?: boolean
   totalPrice?: boolean
 }
 
-export type TransactionItemOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "transactionId" | "productId" | "productName" | "quantity" | "price" | "totalPrice", ExtArgs["result"]["transactionItem"]>
+export type TransactionItemOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "transactionId" | "productId" | "productName" | "quantity" | "price" | "discount" | "totalPrice", ExtArgs["result"]["transactionItem"]>
 export type TransactionItemInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   product?: boolean | Prisma.ProductDefaultArgs<ExtArgs>
   transaction?: boolean | Prisma.TransactionDefaultArgs<ExtArgs>
@@ -751,6 +796,7 @@ export type $TransactionItemPayload<ExtArgs extends runtime.Types.Extensions.Int
     productName: string
     quantity: number
     price: number
+    discount: number
     totalPrice: number
   }, ExtArgs["result"]["transactionItem"]>
   composites: {}
@@ -1183,6 +1229,7 @@ export interface TransactionItemFieldRefs {
   readonly productName: Prisma.FieldRef<"TransactionItem", 'String'>
   readonly quantity: Prisma.FieldRef<"TransactionItem", 'Int'>
   readonly price: Prisma.FieldRef<"TransactionItem", 'Float'>
+  readonly discount: Prisma.FieldRef<"TransactionItem", 'Float'>
   readonly totalPrice: Prisma.FieldRef<"TransactionItem", 'Float'>
 }
     

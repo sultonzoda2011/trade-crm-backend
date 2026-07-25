@@ -54,6 +54,7 @@ export const ModelName = {
   User: 'User',
   RefreshToken: 'RefreshToken',
   Market: 'Market',
+  Category: 'Category',
   Product: 'Product',
   Debtor: 'Debtor',
   Transaction: 'Transaction',
@@ -116,14 +117,28 @@ export const MarketScalarFieldEnum = {
 export type MarketScalarFieldEnum = (typeof MarketScalarFieldEnum)[keyof typeof MarketScalarFieldEnum]
 
 
+export const CategoryScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  marketId: 'marketId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CategoryScalarFieldEnum = (typeof CategoryScalarFieldEnum)[keyof typeof CategoryScalarFieldEnum]
+
+
 export const ProductScalarFieldEnum = {
   id: 'id',
   name: 'name',
   description: 'description',
   price: 'price',
   quantity: 'quantity',
+  unit: 'unit',
+  lowStockThreshold: 'lowStockThreshold',
   image: 'image',
   marketId: 'marketId',
+  categoryId: 'categoryId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -148,11 +163,14 @@ export const TransactionScalarFieldEnum = {
   marketId: 'marketId',
   createdById: 'createdById',
   debtorId: 'debtorId',
+  refundOfId: 'refundOfId',
   type: 'type',
   paymentType: 'paymentType',
   totalAmount: 'totalAmount',
+  discountAmount: 'discountAmount',
   remainingAmount: 'remainingAmount',
   status: 'status',
+  dueDate: 'dueDate',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -167,6 +185,7 @@ export const TransactionItemScalarFieldEnum = {
   productName: 'productName',
   quantity: 'quantity',
   price: 'price',
+  discount: 'discount',
   totalPrice: 'totalPrice'
 } as const
 

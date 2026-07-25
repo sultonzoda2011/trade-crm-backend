@@ -55,6 +55,11 @@ export type RefreshToken = Prisma.RefreshTokenModel
  */
 export type Market = Prisma.MarketModel
 /**
+ * Model Category
+ * 
+ */
+export type Category = Prisma.CategoryModel
+/**
  * Model Product
  * 
  */
