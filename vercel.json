@@ -2,12 +2,6 @@
   "buildCommand": "npx prisma generate && npm run build",
   "installCommand": "npm install",
   "outputDirectory": ".",
-  "functions": {
-    "api/index.js": {
-      "memory": 512,
-      "maxDuration": 15
-    }
-  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/api" }
   ]
