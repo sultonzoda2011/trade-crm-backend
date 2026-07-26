@@ -4,7 +4,8 @@
 	"description": "TradeCRM — CRM for markets (NestJS + Prisma + PostgreSQL)",
 	"private": true,
 	"scripts": {
-		"build": "nest build",
+		"build": "prisma generate && nest build",
+		"postinstall": "prisma generate",
 		"start": "node dist/src/main",
 		"start:dev": "nest start --watch",
 		"prisma:generate": "prisma generate",
