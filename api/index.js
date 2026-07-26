@@ -1,7 +1,7 @@
 const { NestFactory } = require('@nestjs/core')
 const { ExpressAdapter } = require('@nestjs/platform-express')
 const { ValidationPipe } = require('@nestjs/common')
-const { DocumentBuilder, SwaggerModule } = require('@nestjs/swagger')
+const { SwaggerModule, DocumentBuilder } = require('@nestjs/swagger')
 const express = require('express')
 
 const { AppModule } = require('../dist/src/app.module')
@@ -11,7 +11,9 @@ let cachedApp
 async function bootstrap() {
 	if (cachedApp) return cachedApp
 
-	const app = await NestFactory.create(AppModule, new ExpressAdapter(express()))
+	const server = express()
+
+	const app = await NestFactory.create(AppModule, new ExpressAdapter(server))
 
 	app.enableShutdownHooks()
 
@@ -43,6 +45,7 @@ async function bootstrap() {
 		})
 	)
 
+	// Swagger
 	const swaggerConfig = new DocumentBuilder()
 		.setTitle('TradeCRM API')
 		.setDescription('CRM for managing markets')
@@ -59,7 +62,15 @@ async function bootstrap() {
 
 	const document = SwaggerModule.createDocument(app, swaggerConfig)
 
-	SwaggerModule.setup('api/docs', app, document)
+	SwaggerModule.setup('docs', app, document, {
+		swaggerOptions: {
+			persistAuthorization: true,
+			docExpansion: 'list',
+			filter: true,
+			showRequestDuration: true
+		},
+		customSiteTitle: 'TradeCRM API Docs'
+	})
 
 	await app.init()
 
@@ -71,6 +82,7 @@ async function bootstrap() {
 module.exports = async (req, res) => {
 	try {
 		const app = await bootstrap()
+
 		app.getHttpAdapter().getInstance()(req, res)
 	} catch (err) {
 		console.error('Vercel handler error:', err)
