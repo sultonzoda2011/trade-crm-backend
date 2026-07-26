@@ -1,6 +1,9 @@
 const { NestFactory } = require('@nestjs/core');
 const { ExpressAdapter } = require('@nestjs/platform-express');
 const { ValidationPipe } = require('@nestjs/common');
+const { DocumentBuilder, SwaggerModule } = require('@nestjs/swagger');
+const path = require('path');
+const swaggerUi = require('swagger-ui-dist');
 
 let cachedApp;
 
@@ -39,7 +42,6 @@ async function bootstrap() {
     }),
   );
 
-  const { DocumentBuilder, SwaggerModule } = require('@nestjs/swagger');
   const swaggerConfig = new DocumentBuilder()
     .setTitle('TradeCRM API')
     .setDescription('CRM for managing markets')
@@ -48,15 +50,49 @@ async function bootstrap() {
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'bearer')
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document, {
-    swaggerOptions: {
-      persistAuthorization: true,
-      docExpansion: 'list',
-      filter: true,
-      showRequestDuration: true,
-      syntaxHighlight: { theme: 'monokai' },
-    },
-    customSiteTitle: 'TradeCRM API Docs',
+
+  const expressApp = app.getHttpAdapter().getInstance();
+  const swaggerDistPath = swaggerUi.getAbsoluteFSPath();
+
+  expressApp.use('/api/docs/swagger-ui-dist', express.static(swaggerDistPath));
+
+  expressApp.get('/api/docs', (req, res) => {
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>TradeCRM API Docs</title>
+        <link rel="stylesheet" href="./swagger-ui-dist/swagger-ui.css">
+        <style>html { box-sizing: border-box; overflow-y: scroll; }</style>
+      </head>
+      <body>
+        <div id="swagger-ui"></div>
+        <script src="./swagger-ui-dist/swagger-ui-bundle.js"></script>
+        <script src="./swagger-ui-dist/swagger-ui-standalone-preset.js"></script>
+        <script>
+          window.onload = function() {
+            SwaggerUIBundle({
+              spec: ${JSON.stringify(document)},
+              dom_id: '#swagger-ui',
+              deepLinking: true,
+              presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIStandalonePreset,
+              ],
+              plugins: [SwaggerUIBundle.plugins.DownloadUrl],
+              layout: 'StandaloneLayout',
+              docExpansion: 'list',
+              filter: true,
+              persistAuthorization: true,
+              showRequestDuration: true,
+              syntaxHighlight: { theme: 'monokai' },
+            });
+          };
+        </script>
+      </body>
+      </html>
+    `);
   });
 
   await app.init();
