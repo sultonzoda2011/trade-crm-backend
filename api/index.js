@@ -73,7 +73,7 @@ async function bootstrap() {
 	})
 
 	await app.init()
-
+	console.log('SWAGGER ENABLED')
 	cachedApp = app
 
 	return app
