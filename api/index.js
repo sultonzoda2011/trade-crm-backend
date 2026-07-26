@@ -1,6 +1,7 @@
 const { NestFactory } = require('@nestjs/core')
 const { ExpressAdapter } = require('@nestjs/platform-express')
 const { ValidationPipe } = require('@nestjs/common')
+const { DocumentBuilder, SwaggerModule } = require('@nestjs/swagger')
 const express = require('express')
 
 const { AppModule } = require('../dist/src/app.module')
@@ -15,6 +16,7 @@ async function bootstrap() {
 	app.enableShutdownHooks()
 
 	app.setGlobalPrefix('api')
+
 	app.enableCors({
 		origin:
 			process.env.NODE_ENV === 'production'
@@ -35,12 +37,34 @@ async function bootstrap() {
 			whitelist: true,
 			forbidNonWhitelisted: true,
 			transform: true,
-			transformOptions: { enableImplicitConversion: true }
+			transformOptions: {
+				enableImplicitConversion: true
+			}
 		})
 	)
 
+	const swaggerConfig = new DocumentBuilder()
+		.setTitle('TradeCRM API')
+		.setDescription('CRM for managing markets')
+		.setVersion('1.0')
+		.addBearerAuth(
+			{
+				type: 'http',
+				scheme: 'bearer',
+				bearerFormat: 'JWT'
+			},
+			'bearer'
+		)
+		.build()
+
+	const document = SwaggerModule.createDocument(app, swaggerConfig)
+
+	SwaggerModule.setup('api/docs', app, document)
+
 	await app.init()
+
 	cachedApp = app
+
 	return app
 }
 
@@ -50,6 +74,10 @@ module.exports = async (req, res) => {
 		app.getHttpAdapter().getInstance()(req, res)
 	} catch (err) {
 		console.error('Vercel handler error:', err)
-		res.status(500).json({ success: false, message: 'Internal Server Error' })
+
+		res.status(500).json({
+			success: false,
+			message: 'Internal Server Error'
+		})
 	}
 }
