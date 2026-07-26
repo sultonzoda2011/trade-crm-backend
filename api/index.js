@@ -39,6 +39,26 @@ async function bootstrap() {
     }),
   );
 
+  const { DocumentBuilder, SwaggerModule } = require('@nestjs/swagger');
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('TradeCRM API')
+    .setDescription('CRM for managing markets')
+    .setVersion('1.0')
+    .addServer('https://trade-crm-api.vercel.app', 'Production')
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'bearer')
+    .build();
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      docExpansion: 'list',
+      filter: true,
+      showRequestDuration: true,
+      syntaxHighlight: { theme: 'monokai' },
+    },
+    customSiteTitle: 'TradeCRM API Docs',
+  });
+
   await app.init();
   cachedApp = app;
   return cachedApp;
