@@ -2,12 +2,10 @@
   "buildCommand": "npx prisma generate && npm run build",
   "installCommand": "npm install",
   "framework": null,
-  "nodeVersion": "20",
   "functions": {
     "api/index.js": {
       "memory": 512,
-      "maxDuration": 15,
-      "runtime": "@vercel/node@4"
+      "maxDuration": 15
     }
   },
   "rewrites": [
