@@ -1,11 +1,14 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
-import { compare } from 'bcrypt'
+import { compare, hash } from 'bcrypt'
 import { createHash, randomUUID } from 'crypto'
+import { Express } from 'express'
 import { JwtPayload } from '../interfaces'
 import { PrismaService } from '../prisma/prisma.service'
+import { StorageService } from '../common/services/storage.service'
 import { AuthResponseDto } from './dto/auth-response.dto'
+import { UpdateProfileDto } from './dto/update-profile.dto'
 
 @Injectable()
 export class AuthService {
@@ -14,7 +17,8 @@ export class AuthService {
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly jwtService: JwtService,
-		private readonly configService: ConfigService
+		private readonly configService: ConfigService,
+		private readonly storageService: StorageService,
 	) {
 		this.refreshTokenExpiresIn = this.configService.getOrThrow<string>(
 			'JWT_REFRESH_EXPIRES_IN'
@@ -85,6 +89,57 @@ export class AuthService {
 				marketId: storedToken.user.marketId ?? undefined
 			}
 		)
+	}
+
+	async getProfile(userId: string) {
+		const user = await this.prisma.user.findUnique({
+			where: { id: userId },
+			select: { id: true, name: true, email: true, image: true, role: true, marketId: true, createdAt: true },
+		})
+		if (!user) throw new NotFoundException('User not found')
+		return user
+	}
+
+	async updateProfile(userId: string, dto: UpdateProfileDto, file?: Express.Multer.File) {
+		const user = await this.prisma.user.findUnique({ where: { id: userId } })
+		if (!user) throw new NotFoundException('User not found')
+
+		const isChangingPassword = dto.newPassword || dto.oldPassword || dto.confirmPassword
+		if (isChangingPassword) {
+			if (!dto.oldPassword || !dto.newPassword || !dto.confirmPassword) {
+				throw new BadRequestException('All password fields (oldPassword, newPassword, confirmPassword) are required')
+			}
+			if (dto.newPassword !== dto.confirmPassword) {
+				throw new BadRequestException('New password and confirm password do not match')
+			}
+			const isOldPasswordValid = await compare(dto.oldPassword, user.password)
+			if (!isOldPasswordValid) {
+				throw new BadRequestException('Current password is incorrect')
+			}
+		}
+
+		if (dto.email && dto.email !== user.email) {
+			const existing = await this.prisma.user.findUnique({ where: { email: dto.email } })
+			if (existing) throw new ConflictException('Email already in use')
+		}
+
+		const data: any = {}
+		if (dto.name !== undefined) data.name = dto.name
+		if (dto.email !== undefined) data.email = dto.email
+		if (dto.newPassword) data.password = await hash(dto.newPassword, 10)
+
+		if (file) {
+			if (user.image) {
+				await this.storageService.delete(user.image)
+			}
+			data.image = await this.storageService.save(file, 'users')
+		}
+
+		return this.prisma.user.update({
+			where: { id: userId },
+			data,
+			select: { id: true, name: true, email: true, image: true, role: true, marketId: true, createdAt: true },
+		})
 	}
 
 	async logout(refreshToken: string): Promise<void> {

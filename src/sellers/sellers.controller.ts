@@ -6,10 +6,15 @@ import {
 	Param,
 	Patch,
 	Post,
-	Query
+	Query,
+	UploadedFile,
+	UseInterceptors
 } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import {
 	ApiBearerAuth,
+	ApiBody,
+	ApiConsumes,
 	ApiCreatedResponse,
 	ApiOkResponse,
 	ApiOperation,
@@ -23,12 +28,14 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtPayload } from '../interfaces'
 import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe'
 import { ApiErrorResponse } from '../common/decorators/api-error-response.decorator'
+import { multerOptions } from '../common/utils/multipart.util'
 import { SellersService } from './sellers.service'
 import { CreateSellerDto } from './dto/create-seller.dto'
 import { UpdateSellerDto } from './dto/update-seller.dto'
 import { QuerySellerDto } from './dto/query-seller.dto'
 import { SellerResponseDto } from './dto/seller-response.dto'
 import { PaginatedResult } from '../common/dto/pagination.dto'
+import { Express } from 'express'
 
 @ApiTags('Sellers')
 @ApiBearerAuth()
@@ -43,12 +50,27 @@ export class SellersController {
 		summary: 'Create a seller',
 		description: "Creates a new seller in the owner's market."
 	})
+	@ApiConsumes('multipart/form-data')
+	@ApiBody({
+		schema: {
+			type: 'object',
+			required: ['name', 'email', 'password'],
+			properties: {
+				name: { type: 'string', example: 'John Doe' },
+				email: { type: 'string', example: 'seller@tradecrm.com' },
+				password: { type: 'string', example: 'StrongP@ss1' },
+				image: { type: 'string', format: 'binary', description: 'Seller avatar (jpg, png, webp, gif; max 5MB)' },
+			},
+		},
+	})
 	@ApiCreatedResponse({ type: SellerResponseDto })
+	@UseInterceptors(FileInterceptor('image', multerOptions))
 	create(
 		@Body() dto: CreateSellerDto,
+		@UploadedFile() file?: Express.Multer.File,
 		@CurrentUser('marketId') marketId?: string
 	) {
-		return this.sellersService.create(dto, marketId)
+		return this.sellersService.create(dto, file, marketId)
 	}
 
 	@Get()
@@ -85,13 +107,27 @@ export class SellersController {
 	@Patch(':id')
 	@ApiOperation({ summary: 'Update a seller' })
 	@ApiParam({ name: 'id', type: String, format: 'uuid' })
+	@ApiConsumes('multipart/form-data')
+	@ApiBody({
+		schema: {
+			type: 'object',
+			properties: {
+				name: { type: 'string', example: 'John Doe' },
+				email: { type: 'string', example: 'seller@tradecrm.com' },
+				password: { type: 'string', example: 'StrongP@ss1' },
+				image: { type: 'string', format: 'binary', description: 'New seller avatar (replaces existing). Omit to keep current.' },
+			},
+		},
+	})
 	@ApiOkResponse({ type: SellerResponseDto })
+	@UseInterceptors(FileInterceptor('image', multerOptions))
 	update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() dto: UpdateSellerDto,
+		@UploadedFile() file?: Express.Multer.File,
 		@CurrentUser('marketId') marketId?: string
 	) {
-		return this.sellersService.update(id, dto, marketId)
+		return this.sellersService.update(id, dto, file, marketId)
 	}
 
 	@Delete(':id')

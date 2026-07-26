@@ -16,8 +16,8 @@ export class DashboardController {
 
   @Get()
   @ApiOkResponse({ type: DashboardResponseDto })
-  getDashboard(@CurrentUser() user: JwtPayload) {
-    return this.dashboardService.getDashboard(user.marketId)
+  getDashboard(@Query() query: QueryDashboardDto, @CurrentUser() user: JwtPayload) {
+    return this.dashboardService.getDashboard(query, user.marketId)
   }
 
   @Get('sellers-report')

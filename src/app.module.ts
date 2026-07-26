@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
+import { HealthModule } from './health/health.module'
 import { APP_GUARD } from '@nestjs/core'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import { AuthModule } from './auth/auth.module'
@@ -34,7 +35,8 @@ import { validate } from './config/env.validation'
 		SellersModule,
 		DebtorsModule,
 		TransactionsModule,
-		DashboardModule
+		DashboardModule,
+		HealthModule
 	],
 	providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }]
 })

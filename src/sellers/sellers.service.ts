@@ -5,8 +5,11 @@ import {
 	UnauthorizedException
 } from '@nestjs/common'
 import { hash } from 'bcrypt'
+import { Express } from 'express'
 import { PaginatedResult } from '../common/dto/pagination.dto'
 import { PrismaService } from '../prisma/prisma.service'
+import { StorageService } from '../common/services/storage.service'
+import { buildDateWhere, buildOrderBy, paginate } from '../common/utils/paginate.util'
 import { CreateSellerDto } from './dto/create-seller.dto'
 import { QuerySellerDto } from './dto/query-seller.dto'
 import { UpdateSellerDto } from './dto/update-seller.dto'
@@ -15,18 +18,22 @@ const sellerSelect = {
 	id: true,
 	name: true,
 	email: true,
+	image: true,
 	role: true,
 	createdAt: true,
 	market: {
-		select: { id: true, name: true, address: true }
+		select: { id: true, name: true, address: true, image: true }
 	}
 } as const
 
 @Injectable()
 export class SellersService {
-	constructor(private readonly prisma: PrismaService) {}
+	constructor(
+		private readonly prisma: PrismaService,
+		private readonly storageService: StorageService,
+	) {}
 
-	async create(dto: CreateSellerDto, marketId?: string) {
+	async create(dto: CreateSellerDto, file?: Express.Multer.File, marketId?: string) {
 		if (!marketId)
 			throw new UnauthorizedException('User is not assigned to a market')
 
@@ -36,12 +43,14 @@ export class SellersService {
 		if (existing) throw new ConflictException('Email already in use')
 
 		const hashedPassword = await hash(dto.password, 10)
+		const image = file ? await this.storageService.save(file, 'sellers') : undefined
 
 		return this.prisma.user.create({
 			data: {
 				name: dto.name,
 				email: dto.email,
 				password: hashedPassword,
+				image,
 				role: 'SELLER',
 				marketId
 			},
@@ -62,26 +71,18 @@ export class SellersService {
 				{ email: { contains: query.search, mode: 'insensitive' } }
 			]
 		}
+		if (query.dateFrom || query.dateTo) where.createdAt = buildDateWhere(query.dateFrom, query.dateTo)
 
-		const page = query.page ?? 1
-		const limit = query.limit ?? 20
-		const skip = (page - 1) * limit
-
-		const [data, total] = await Promise.all([
+		return paginate(query, ({ skip, take }) =>
 			this.prisma.user.findMany({
 				where,
 				select: sellerSelect,
-				orderBy: { createdAt: 'desc' },
+				orderBy: buildOrderBy(query.sortBy, query.sortOrder),
 				skip,
-				take: limit
+				take
 			}),
-			this.prisma.user.count({ where })
-		])
-
-		return {
-			data,
-			meta: { page, limit, total, totalPages: Math.ceil(total / limit) }
-		}
+			() => this.prisma.user.count({ where })
+		)
 	}
 
 	async findOne(id: string, marketId?: string) {
@@ -96,8 +97,8 @@ export class SellersService {
 		return seller
 	}
 
-	async update(id: string, dto: UpdateSellerDto, marketId?: string) {
-		await this.findOne(id, marketId)
+	async update(id: string, dto: UpdateSellerDto, file?: Express.Multer.File, marketId?: string) {
+		const seller = await this.findOne(id, marketId)
 
 		if (dto.email) {
 			const existing = await this.prisma.user.findUnique({
@@ -110,6 +111,13 @@ export class SellersService {
 		const data: any = { ...dto }
 		if (dto.password) data.password = await hash(dto.password, 10)
 
+		if (file) {
+			if (seller.image) {
+				await this.storageService.delete(seller.image)
+			}
+			data.image = await this.storageService.save(file, 'sellers')
+		}
+
 		return this.prisma.user.update({
 			where: { id },
 			data,
@@ -118,7 +126,12 @@ export class SellersService {
 	}
 
 	async remove(id: string, marketId?: string) {
-		await this.findOne(id, marketId)
+		const seller = await this.findOne(id, marketId)
+
+		if (seller.image) {
+			await this.storageService.delete(seller.image)
+		}
+
 		await this.prisma.user.delete({ where: { id } })
 	}
 }

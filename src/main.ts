@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config'
 import { NestFactory } from '@nestjs/core'
 import { NestExpressApplication } from '@nestjs/platform-express'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
-import { join } from 'path'
 import 'reflect-metadata'
 import { AppModule } from './app.module'
 
@@ -20,14 +19,17 @@ async function bootstrap() {
 	app.enableCors({
 		origin:
 			nodeEnv === 'production'
-				? ['https://trade-crm.vercel.app']
+				? [
+						'https://trade-crm.vercel.app',
+						'capacitor://localhost',
+						'http://localhost',
+						'https://localhost'
+					]
 				: ['http://localhost:5173', 'http://localhost:3000'],
 		credentials: true,
 		methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
 		allowedHeaders: ['Content-Type', 'Authorization']
 	})
-
-	app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' })
 
 	app.useGlobalPipes(
 		new ValidationPipe({

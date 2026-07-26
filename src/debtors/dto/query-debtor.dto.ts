@@ -1,25 +1,26 @@
-import { IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
+import { IsBoolean, IsNumber, IsOptional, Min } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
+import { BaseQueryDto } from '../../common/dto/base-query.dto'
 
-export class QueryDebtorDto {
-  @ApiPropertyOptional({ example: 1, description: 'Page number (1-based)' })
+export class QueryDebtorDto extends BaseQueryDto {
+  @ApiPropertyOptional({ description: 'Only debtors with active/partial debts' })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  hasActiveDebts?: boolean
+
+  @ApiPropertyOptional({ description: 'Minimum total debt amount (sum of remainingAmount across all active debts)' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  @Min(1)
-  page?: number = 1
+  @Min(0)
+  minDebtAmount?: number
 
-  @ApiPropertyOptional({ example: 20, description: 'Number of items per page (max 100)' })
+  @ApiPropertyOptional({ description: 'Maximum total debt amount' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  @Min(1)
-  @Max(100)
-  limit?: number = 20
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  search?: string
+  @Min(0)
+  maxDebtAmount?: number
 }

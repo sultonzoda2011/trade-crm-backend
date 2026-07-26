@@ -1,13 +1,20 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common'
+import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, UploadedFile, UseInterceptors } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
-import { ApiBearerAuth, ApiOkResponse, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOkResponse, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { AuthService } from './auth.service'
 import { Public } from './decorators/public.decorator'
+import { CurrentUser } from './decorators/current-user.decorator'
 import { ApiErrorResponse } from '../common/decorators/api-error-response.decorator'
+import { multerOptions } from '../common/utils/multipart.util'
+import { JwtPayload } from '../interfaces'
 import { AuthResponseDto } from './dto/auth-response.dto'
 import { LoginDto } from './dto/login.dto'
 import { LogoutDto } from './dto/logout.dto'
 import { RefreshDto } from './dto/refresh.dto'
+import { UpdateProfileDto } from './dto/update-profile.dto'
+import { ProfileResponseDto } from './dto/profile-response.dto'
+import { Express } from 'express'
 
 @ApiTags('Auth')
 @ApiErrorResponse()
@@ -40,5 +47,38 @@ export class AuthController {
   @ApiOkResponse({ description: 'Token revoked' })
   logout(@Body() dto: LogoutDto): Promise<void> {
     return this.authService.logout(dto.refreshToken)
+  }
+
+  @Get('profile')
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: ProfileResponseDto })
+  getProfile(@CurrentUser() user: JwtPayload) {
+    return this.authService.getProfile(user.sub)
+  }
+
+  @Patch('profile')
+  @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', example: 'John Doe' },
+        email: { type: 'string', example: 'john@tradecrm.com' },
+        oldPassword: { type: 'string', description: 'Current password (required to set a new password)' },
+        newPassword: { type: 'string', description: 'New password (min 8 chars, upper+lower+digit)' },
+        confirmPassword: { type: 'string', description: 'Confirm new password' },
+        image: { type: 'string', format: 'binary', description: 'New avatar (replaces existing). Omit to keep current.' },
+      },
+    },
+  })
+  @ApiOkResponse({ type: ProfileResponseDto })
+  @UseInterceptors(FileInterceptor('image', multerOptions))
+  updateProfile(
+    @Body() dto: UpdateProfileDto,
+    @UploadedFile() file?: Express.Multer.File,
+    @CurrentUser() user?: JwtPayload,
+  ) {
+    return this.authService.updateProfile(user!.sub, dto, file)
   }
 }

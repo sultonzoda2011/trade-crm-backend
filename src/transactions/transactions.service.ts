@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { TransactionStatus, TransactionType } from '../enums'
 import { JwtPayload } from '../interfaces'
 import { PaginatedResult } from '../common/dto/pagination.dto'
-import { paginate } from '../common/utils/paginate.util'
+import { buildDateWhere, buildOrderBy, paginate } from '../common/utils/paginate.util'
 import { CreateTransactionDto } from './dto/create-transaction.dto'
 import { CreatePaymentDto } from './dto/create-payment.dto'
 import { QueryTransactionDto } from './dto/query-transaction.dto'
@@ -127,12 +127,26 @@ export class TransactionsService {
 
 		if (userMarketId) where.marketId = userMarketId
 		if (query.debtorId) where.debtorId = query.debtorId
+		if (query.createdById) where.createdById = query.createdById
 		if (query.type) where.type = query.type
 		if (query.status) where.status = query.status
-		if (query.dateFrom || query.dateTo) {
-			where.createdAt = {}
-			if (query.dateFrom) where.createdAt.gte = new Date(query.dateFrom)
-			if (query.dateTo) where.createdAt.lte = new Date(query.dateTo)
+		if (query.dateFrom || query.dateTo) where.createdAt = buildDateWhere(query.dateFrom, query.dateTo)
+		if (query.search) {
+			where.debtor = { name: { contains: query.search, mode: 'insensitive' } }
+		}
+		if (query.paymentType) where.paymentType = query.paymentType
+		if (query.categoryId || query.productId) {
+			where.items = {
+				some: {
+					...(query.productId ? { productId: query.productId } : {}),
+					...(query.categoryId ? { product: { categoryId: query.categoryId } } : {})
+				}
+			}
+		}
+		if (query.minAmount != null || query.maxAmount != null) {
+			where.totalAmount = {}
+			if (query.minAmount != null) where.totalAmount.gte = query.minAmount
+			if (query.maxAmount != null) where.totalAmount.lte = query.maxAmount
 		}
 
 		return paginate(
@@ -141,7 +155,7 @@ export class TransactionsService {
 				this.prisma.transaction.findMany({
 					where,
 					include: transactionInclude,
-					orderBy: { createdAt: 'desc' },
+					orderBy: buildOrderBy(query.sortBy, query.sortOrder),
 					skip,
 					take
 				}),

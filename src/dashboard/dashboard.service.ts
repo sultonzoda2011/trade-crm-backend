@@ -1,17 +1,65 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { QueryDashboardDto } from './dto/query-dashboard.dto'
+import { QueryDashboardDto, DashboardPeriod } from './dto/query-dashboard.dto'
+
+function buildPeriodDateRange(period: DashboardPeriod) {
+  const now = new Date()
+  const end = new Date(now)
+  end.setHours(23, 59, 59, 999)
+
+  switch (period) {
+    case DashboardPeriod.TODAY: {
+      const start = new Date(now)
+      start.setHours(0, 0, 0, 0)
+      return { gte: start, lte: end }
+    }
+    case DashboardPeriod.WEEK: {
+      const monday = new Date(now)
+      monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
+      monday.setHours(0, 0, 0, 0)
+      return { gte: monday, lte: end }
+    }
+    case DashboardPeriod.MONTH:
+      return { gte: new Date(now.getFullYear(), now.getMonth(), 1), lte: end }
+    case DashboardPeriod.YEAR:
+      return { gte: new Date(now.getFullYear(), 0, 1), lte: end }
+  }
+}
 
 @Injectable()
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getDashboard(marketId?: string) {
-    const todayStart = new Date(new Date().setHours(0, 0, 0, 0))
+  async getDashboard(query: QueryDashboardDto, marketId?: string) {
+    const marketFilter: { marketId?: string } = marketId ? { marketId } : {}
+
+    const transactionWhere: Record<string, any> = { ...marketFilter }
+    if (query.sellerId) transactionWhere.createdById = query.sellerId
+
+    let dateFilter: { gte?: Date; lte?: Date } = {}
+    if (query.period) {
+      dateFilter = buildPeriodDateRange(query.period)
+    } else if (query.dateFrom || query.dateTo) {
+      if (query.dateFrom) dateFilter.gte = new Date(query.dateFrom)
+      if (query.dateTo) dateFilter.lte = new Date(query.dateTo)
+    }
+
+    const hasDateFilter = Object.keys(dateFilter).length > 0
+    const dateWhere = hasDateFilter ? { ...transactionWhere, createdAt: dateFilter } : transactionWhere
+
+    const userWhere: { marketId?: string } = { ...marketFilter }
+    const debtorWhere: Record<string, any> = { ...marketFilter }
+    if (query.sellerId) {
+      debtorWhere.transactions = { some: { createdById: query.sellerId } }
+    }
+
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const daysWhere = marketId
+      ? { marketId, ...(query.sellerId ? { createdById: query.sellerId } : {}), createdAt: { gte: todayStart } }
+      : { createdAt: { gte: todayStart } }
 
     const marketWhere = marketId ? { id: marketId } : {}
-    const where = marketId ? { marketId } : {}
-    const daysWhere = marketId ? { ...where, createdAt: { gte: todayStart } } : { createdAt: { gte: todayStart } }
 
     const [
       totalMarkets,
@@ -27,23 +75,23 @@ export class DashboardService {
       topDebtorGroups,
     ] = await Promise.all([
       this.prisma.market.count({ where: marketWhere }),
-      this.prisma.user.count({ where }),
-      this.prisma.debtor.count({ where }),
-      this.prisma.transaction.count({ where }),
-      this.prisma.transaction.count({ where: { ...where, type: 'DEBT', status: 'ACTIVE' } }),
-      this.prisma.transaction.count({ where: { ...where, type: 'DEBT', status: 'PARTIAL' } }),
+      this.prisma.user.count({ where: userWhere }),
+      this.prisma.debtor.count({ where: debtorWhere }),
+      this.prisma.transaction.count({ where: dateWhere }),
+      this.prisma.transaction.count({ where: { ...dateWhere, type: 'DEBT', status: 'ACTIVE' } }),
+      this.prisma.transaction.count({ where: { ...dateWhere, type: 'DEBT', status: 'PARTIAL' } }),
       this.prisma.transaction.aggregate({
         _sum: { remainingAmount: true },
-        where: { ...where, type: 'DEBT', status: { in: ['ACTIVE', 'PARTIAL'] } },
+        where: { ...dateWhere, type: 'DEBT', status: { in: ['ACTIVE', 'PARTIAL'] } },
       }),
       this.prisma.transaction.aggregate({
         _sum: { totalAmount: true },
-        where: { ...where, type: 'SALE' },
+        where: { ...dateWhere, type: 'SALE' },
       }),
       this.prisma.transaction.count({ where: daysWhere }),
       this.prisma.transaction.findMany({
-        where,
-        take: 8,
+        where: dateWhere,
+        take: 5,
         orderBy: { createdAt: 'desc' },
         include: {
           debtor: { select: { id: true, name: true } },
@@ -54,7 +102,7 @@ export class DashboardService {
       this.prisma.transaction.groupBy({
         by: ['debtorId'],
         where: {
-          ...where,
+          ...dateWhere,
           debtorId: { not: null },
           type: 'DEBT',
           status: { in: ['ACTIVE', 'PARTIAL'] },
@@ -112,14 +160,17 @@ export class DashboardService {
    * вычитается из суммы продаж того же продавца.
    */
   async getSellersReport(query: QueryDashboardDto, marketId?: string) {
-    const dateFilter: any = {}
-    if (query.dateFrom) dateFilter.gte = new Date(query.dateFrom)
-    if (query.dateTo) dateFilter.lte = new Date(query.dateTo)
+    const where: any = marketId ? { marketId } : {}
+    if (query.sellerId) where.createdById = query.sellerId
 
-    const where: any = {
-      ...(marketId ? { marketId } : {}),
-      ...(Object.keys(dateFilter).length ? { createdAt: dateFilter } : {}),
+    let dateFilter: { gte?: Date; lte?: Date } = {}
+    if (query.period) {
+      dateFilter = buildPeriodDateRange(query.period)
+    } else if (query.dateFrom || query.dateTo) {
+      if (query.dateFrom) dateFilter.gte = new Date(query.dateFrom)
+      if (query.dateTo) dateFilter.lte = new Date(query.dateTo)
     }
+    if (Object.keys(dateFilter).length) where.createdAt = dateFilter
 
     const [saleGroups, refundGroups, debtGroups] = await Promise.all([
       this.prisma.transaction.groupBy({

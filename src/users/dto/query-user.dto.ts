@@ -1,31 +1,23 @@
-import { IsEnum, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
+import { IsBoolean, IsEnum, IsOptional, IsUUID } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
+import { BaseQueryDto } from '../../common/dto/base-query.dto'
 import { Role } from '../../enums'
 
-export class QueryUserDto {
-  @ApiPropertyOptional({ example: 1, description: 'Page number (1-based)' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  page?: number = 1
-
-  @ApiPropertyOptional({ example: 20, description: 'Number of items per page (max 100)' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  @Max(100)
-  limit?: number = 20
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  search?: string
-
+export class QueryUserDto extends BaseQueryDto {
   @ApiPropertyOptional({ enum: Role })
   @IsOptional()
   @IsEnum(Role)
   role?: Role
+
+  @ApiPropertyOptional({ description: 'Filter by assigned market' })
+  @IsOptional()
+  @IsUUID()
+  marketId?: string
+
+  @ApiPropertyOptional({ description: 'Only users who own at least one market' })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  isOwner?: boolean
 }

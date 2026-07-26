@@ -5,6 +5,18 @@ interface PaginationInput {
   limit?: number
 }
 
+export function buildOrderBy(sortBy?: string, sortOrder?: 'asc' | 'desc', defaultSortBy = 'createdAt'): Record<string, 'asc' | 'desc'> {
+  return { [sortBy || defaultSortBy]: sortOrder || 'desc' }
+}
+
+export function buildDateWhere(dateFrom?: string, dateTo?: string): { gte?: Date; lte?: Date } | undefined {
+  if (!dateFrom && !dateTo) return undefined
+  const clause: { gte?: Date; lte?: Date } = {}
+  if (dateFrom) clause.gte = new Date(dateFrom)
+  if (dateTo) clause.lte = new Date(dateTo)
+  return clause
+}
+
 /**
  * Общий helper для пагинации, чтобы не дублировать один и тот же
  * page/limit/skip + Promise.all([findMany, count]) в каждом сервисе.

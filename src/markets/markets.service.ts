@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../common/services/storage.service'
 import { PaginatedResult } from '../common/dto/pagination.dto'
+import { buildDateWhere, buildOrderBy, paginate } from '../common/utils/paginate.util'
 import { CreateMarketDto } from './dto/create-market.dto'
 import { QueryMarketDto } from './dto/query-market.dto'
 import { UpdateMarketDto } from './dto/update-market.dto'
@@ -69,37 +70,31 @@ export class MarketsService {
   async findAll(query: QueryMarketDto): Promise<PaginatedResult<unknown>> {
     const where: any = {}
 
+    if (query.ownerId) where.ownerId = query.ownerId
     if (query.search) {
       where.OR = [
         { name: { contains: query.search, mode: 'insensitive' } },
         { address: { contains: query.search, mode: 'insensitive' } },
       ]
     }
+    if (query.dateFrom || query.dateTo) where.createdAt = buildDateWhere(query.dateFrom, query.dateTo)
+    if (query.hasUsers != null) {
+      where.users = query.hasUsers ? { some: {} } : { none: {} }
+    }
+    if (query.hasProducts != null) {
+      where.products = query.hasProducts ? { some: {} } : { none: {} }
+    }
 
-    const page = query.page ?? 1
-    const limit = query.limit ?? 20
-    const skip = (page - 1) * limit
-
-    const [data, total] = await Promise.all([
-      this.prisma.market.findMany({
+    return paginate(query, async ({ skip, take }) => {
+      const data = await this.prisma.market.findMany({
         where,
         include: marketInclude,
-        orderBy: { createdAt: 'desc' },
+        orderBy: buildOrderBy(query.sortBy, query.sortOrder),
         skip,
-        take: limit,
-      }),
-      this.prisma.market.count({ where }),
-    ])
-
-    return {
-      data: await this.enrichManyMarkets(data),
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    }
+        take,
+      })
+      return this.enrichManyMarkets(data)
+    }, () => this.prisma.market.count({ where }))
   }
 
   async findOne(id: string) {

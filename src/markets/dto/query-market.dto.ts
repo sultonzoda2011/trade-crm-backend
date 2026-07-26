@@ -1,25 +1,23 @@
-import { IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
+import { IsBoolean, IsOptional, IsUUID } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
+import { BaseQueryDto } from '../../common/dto/base-query.dto'
 
-export class QueryMarketDto {
-  @ApiPropertyOptional({ example: 1, description: 'Page number (1-based)' })
+export class QueryMarketDto extends BaseQueryDto {
+  @ApiPropertyOptional({ description: 'Filter by owner ID' })
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  page?: number = 1
+  @IsUUID()
+  ownerId?: string
 
-  @ApiPropertyOptional({ example: 20, description: 'Number of items per page (max 100)' })
+  @ApiPropertyOptional({ description: 'Only markets that have at least one user assigned' })
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  @Max(100)
-  limit?: number = 20
+  @Type(() => Boolean)
+  @IsBoolean()
+  hasUsers?: boolean
 
-  @ApiPropertyOptional({ description: 'Search by market name or address' })
+  @ApiPropertyOptional({ description: 'Only markets that have at least one product' })
   @IsOptional()
-  @IsString()
-  search?: string
+  @Type(() => Boolean)
+  @IsBoolean()
+  hasProducts?: boolean
 }

@@ -24,6 +24,9 @@ export class SellerResponseDto {
   @ApiProperty()
   role: string
 
+  @ApiPropertyOptional()
+  image?: string
+
   @ApiProperty()
   createdAt: string
 

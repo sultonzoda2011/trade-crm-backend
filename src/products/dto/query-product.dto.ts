@@ -1,28 +1,9 @@
-import { IsBoolean, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator'
+import { IsBoolean, IsNumber, IsOptional, IsUUID, Min } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
+import { BaseQueryDto } from '../../common/dto/base-query.dto'
 
-export class QueryProductDto {
-  @ApiPropertyOptional({ example: 1, description: 'Page number (1-based)' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  page?: number = 1
-
-  @ApiPropertyOptional({ example: 20, description: 'Number of items per page (max 100)' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  @Max(100)
-  limit?: number = 20
-
-  @ApiPropertyOptional({ description: 'Search by product name' })
-  @IsOptional()
-  @IsString()
-  search?: string
-
+export class QueryProductDto extends BaseQueryDto {
   @ApiPropertyOptional({ description: 'Filter by category ID' })
   @IsOptional()
   @IsUUID()
@@ -33,4 +14,18 @@ export class QueryProductDto {
   @Type(() => Boolean)
   @IsBoolean()
   lowStock?: boolean
+
+  @ApiPropertyOptional({ description: 'Minimum price filter' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  priceMin?: number
+
+  @ApiPropertyOptional({ description: 'Maximum price filter' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  priceMax?: number
 }

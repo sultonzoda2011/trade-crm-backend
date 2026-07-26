@@ -12,6 +12,7 @@ model User {
   name           String
   email          String         @unique
   password       String
+  image          String?
   role           Role
   marketId       String?
   createdAt      DateTime       @default(now())
@@ -55,9 +56,11 @@ model Market {
 }
 
 model Category {
-  id        String    @id @default(uuid())
-  name      String
-  marketId  String
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  image       String?
+  marketId    String
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   market    Market    @relation(fields: [marketId], references: [id], onDelete: Cascade)

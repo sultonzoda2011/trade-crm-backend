@@ -10,7 +10,8 @@
 		"prisma:generate": "prisma generate",
 		"prisma:migrate": "prisma migrate dev",
 		"prisma:studio": "prisma studio",
-		"prisma:seed": "ts-node prisma/seed.ts"
+		"prisma:seed": "ts-node prisma/seed.ts",
+		"migrate:images": "ts-node prisma/migrate-images.ts"
 	},
 	"dependencies": {
 		"@nestjs/common": "^11.1.28",
@@ -26,6 +27,7 @@
 		"bcrypt": "^6.0.0",
 		"class-transformer": "^0.5.1",
 		"class-validator": "^0.15.1",
+		"cloudinary": "^2.10.0",
 		"dotenv": "^17.4.2",
 		"passport": "^0.7.0",
 		"passport-jwt": "^4.0.1",

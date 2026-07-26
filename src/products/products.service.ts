@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/co
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../common/services/storage.service'
 import { PaginatedResult } from '../common/dto/pagination.dto'
-import { paginate } from '../common/utils/paginate.util'
+import { buildDateWhere, buildOrderBy, paginate } from '../common/utils/paginate.util'
 import { CreateProductDto } from './dto/create-product.dto'
 import { QueryProductDto } from './dto/query-product.dto'
 import { UpdateProductDto } from './dto/update-product.dto'
@@ -35,13 +35,19 @@ export class ProductsService {
     if (query.search) {
       where.name = { contains: query.search, mode: 'insensitive' }
     }
+    if (query.dateFrom || query.dateTo) where.createdAt = buildDateWhere(query.dateFrom, query.dateTo)
+    if (query.priceMin != null || query.priceMax != null) {
+      where.price = {}
+      if (query.priceMin != null) where.price.gte = query.priceMin
+      if (query.priceMax != null) where.price.lte = query.priceMax
+    }
     if (query.lowStock) {
       // Prisma не умеет сравнивать два поля одной модели в where напрямую,
       // поэтому для флага "мало на складе" фильтруем через $queryRaw-подобный
       // подход: сначала берём кандидатов, а сравнение quantity <= threshold
       // делаем в приложении. Для больших каталогов лучше вынести в raw SQL,
       // но для MVP объём данных это не оправдывает.
-      const candidates = await this.prisma.product.findMany({ where, include: productInclude })
+      const candidates = await this.prisma.product.findMany({ where, include: productInclude, orderBy: buildOrderBy(query.sortBy, query.sortOrder) })
       const lowStockItems = candidates.filter(p => p.quantity <= p.lowStockThreshold)
       const page = query.page ?? 1
       const limit = query.limit ?? 20
@@ -60,7 +66,7 @@ export class ProductsService {
     return paginate(
       query,
       ({ skip, take }) =>
-        this.prisma.product.findMany({ where, include: productInclude, orderBy: { createdAt: 'desc' }, skip, take }),
+        this.prisma.product.findMany({ where, include: productInclude, orderBy: buildOrderBy(query.sortBy, query.sortOrder), skip, take }),
       () => this.prisma.product.count({ where }),
     )
   }

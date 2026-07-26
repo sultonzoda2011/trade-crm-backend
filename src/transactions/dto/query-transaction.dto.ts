@@ -1,28 +1,19 @@
-import { IsDateString, IsEnum, IsNumber, IsOptional, IsUUID, Max, Min } from 'class-validator'
+import { IsEnum, IsNumber, IsOptional, IsUUID, Min } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
-import { TransactionStatus, TransactionType } from '../../enums'
+import { BaseQueryDto } from '../../common/dto/base-query.dto'
+import { PaymentType, TransactionStatus, TransactionType } from '../../enums'
 
-export class QueryTransactionDto {
-  @ApiPropertyOptional({ example: 1, description: 'Page number (1-based)' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  page?: number = 1
-
-  @ApiPropertyOptional({ example: 20, description: 'Number of items per page (max 100)' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  @Max(100)
-  limit?: number = 20
-
+export class QueryTransactionDto extends BaseQueryDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsUUID()
   debtorId?: string
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  createdById?: string
 
   @ApiPropertyOptional({ enum: TransactionType })
   @IsOptional()
@@ -36,11 +27,30 @@ export class QueryTransactionDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsDateString()
-  dateFrom?: string
+  @IsUUID()
+  categoryId?: string
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsDateString()
-  dateTo?: string
+  @IsUUID()
+  productId?: string
+
+  @ApiPropertyOptional({ enum: PaymentType })
+  @IsOptional()
+  @IsEnum(PaymentType)
+  paymentType?: PaymentType
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minAmount?: number
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxAmount?: number
 }
