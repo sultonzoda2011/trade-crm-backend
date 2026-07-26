@@ -72,9 +72,14 @@ async function bootstrap() {
 	})
 
 	await app.init()
-
-	console.log('SWAGGER ENABLED')
-
+	console.log(
+		'ROUTES:',
+		app
+			.getHttpAdapter()
+			.getInstance()
+			._router.stack.map(r => r.route?.path)
+			.filter(Boolean)
+	)
 	cachedApp = app
 
 	return app
