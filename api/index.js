@@ -51,9 +51,7 @@ async function bootstrap() {
 	const document = SwaggerModule.createDocument(app, swaggerConfig)
 
 	// ВАЖНО: ручная отдача Swagger UI
-	server.use('/api/docs', swaggerUi.serve, swaggerUi.setup(document))
-
-	// JSON документация
+	server.use('/api/docs/', swaggerUi.serve, swaggerUi.setup(document))
 	server.get('/api/docs-json', (req, res) => {
 		res.json(document)
 	})
