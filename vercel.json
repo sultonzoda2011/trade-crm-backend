@@ -1,8 +1,6 @@
 {
-  "buildCommand": "npx prisma generate && npm run build",
-  "installCommand": "npm install --include=dev",
-  "outputDirectory": ".",
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/api" }
-  ]
+	"buildCommand": "npx prisma generate && npm run build",
+	"installCommand": "npm install --include=dev",
+	"outputDirectory": ".",
+	"rewrites": [{ "source": "/(.*)", "destination": "/api/$1" }]
 }
