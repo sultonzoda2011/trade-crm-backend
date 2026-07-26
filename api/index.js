@@ -15,65 +15,83 @@ async function bootstrap() {
 
 	const app = await NestFactory.create(AppModule, new ExpressAdapter(server))
 
-	app.enableShutdownHooks()
-
 	app.setGlobalPrefix('api')
 
 	app.enableCors({
-		origin:
-			process.env.NODE_ENV === 'production'
-				? [
-						'https://trade-crm.vercel.app',
-						'capacitor://localhost',
-						'http://localhost',
-						'https://localhost'
-					]
-				: ['http://localhost:5173', 'http://localhost:3000'],
-		credentials: true,
-		methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-		allowedHeaders: ['Content-Type', 'Authorization']
+		origin: '*',
+		credentials: true
 	})
 
 	app.useGlobalPipes(
 		new ValidationPipe({
 			whitelist: true,
-			forbidNonWhitelisted: true,
-			transform: true,
-			transformOptions: {
-				enableImplicitConversion: true
-			}
+			transform: true
 		})
 	)
 
-	const swaggerConfig = new DocumentBuilder()
+	const config = new DocumentBuilder()
 		.setTitle('TradeCRM API')
-		.setDescription('CRM for managing markets')
+		.setDescription('CRM API')
 		.setVersion('1.0')
-		.addBearerAuth(
-			{
-				type: 'http',
-				scheme: 'bearer',
-				bearerFormat: 'JWT'
-			},
-			'bearer'
-		)
+		.addBearerAuth()
 		.build()
 
-	const document = SwaggerModule.createDocument(app, swaggerConfig)
+	const document = SwaggerModule.createDocument(app, config)
 
-	SwaggerModule.setup('docs', app, document, {
-		swaggerOptions: {
-			persistAuthorization: true,
-			docExpansion: 'list',
-			filter: true,
-			showRequestDuration: true
-		},
-		customSiteTitle: 'TradeCRM API Docs'
-	})
+	// только JSON
+	app
+		.getHttpAdapter()
+		.getInstance()
+		.get('/api/docs-json', (req, res) => {
+			res.json(document)
+		})
+
+	// свой Swagger UI
+	app
+		.getHttpAdapter()
+		.getInstance()
+		.get('/api/docs', (req, res) => {
+			res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+<title>TradeCRM API</title>
+
+<link rel="stylesheet"
+href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">
+
+</head>
+
+<body>
+
+<div id="swagger-ui"></div>
+
+<script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
+
+<script>
+
+window.onload = () => {
+
+SwaggerUIBundle({
+
+url: "/api/docs-json",
+
+dom_id:"#swagger-ui"
+
+})
+
+}
+
+</script>
+
+</body>
+</html>
+			`)
+		})
 
 	await app.init()
 
-	console.log('SWAGGER ENABLED')
+	console.log('Swagger enabled')
 
 	cachedApp = app
 
@@ -81,16 +99,7 @@ async function bootstrap() {
 }
 
 module.exports = async (req, res) => {
-	try {
-		const app = await bootstrap()
+	const app = await bootstrap()
 
-		app.getHttpAdapter().getInstance()(req, res)
-	} catch (error) {
-		console.error('Vercel handler error:', error)
-
-		res.status(500).json({
-			success: false,
-			message: 'Internal Server Error'
-		})
-	}
+	app.getHttpAdapter().getInstance()(req, res)
 }
