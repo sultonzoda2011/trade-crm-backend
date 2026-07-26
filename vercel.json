@@ -2,7 +2,6 @@
   "buildCommand": "npx prisma generate && npm run build",
   "installCommand": "npm install --production=false",
   "outputDirectory": ".",
-  "framework": null,
   "rewrites": [
     { "source": "/(.*)", "destination": "/api" }
   ]
