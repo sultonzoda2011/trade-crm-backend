@@ -40,37 +40,40 @@ async function bootstrap() {
 		})
 	)
 
-	if (nodeEnv === 'production') {
-		logger.log('Swagger docs disabled in production')
-	} else {
-		const swaggerConfig = new DocumentBuilder()
-			.setTitle('TradeCRM API')
-			.setDescription('CRM for managing markets')
-			.setVersion('1.0')
-			.setContact('TradeCRM Team', '', 'support@tradecrm.com')
-			.addServer('http://localhost:4000', 'Development')
-			.addBearerAuth(
-				{ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-				'bearer'
-			)
-			.build()
-
-		const document = SwaggerModule.createDocument(app, swaggerConfig)
-		SwaggerModule.setup('api/docs', app, document, {
-			swaggerOptions: {
-				persistAuthorization: true,
-				docExpansion: 'list',
-				filter: true,
-				showRequestDuration: true,
-				syntaxHighlight: { theme: 'monokai' }
-			},
-			customSiteTitle: 'TradeCRM API Docs'
-		})
-
-		logger.log(
-			`Swagger docs: http://localhost:${configService.get('PORT', 3000)}/api/docs`
+	const swaggerConfig = new DocumentBuilder()
+		.setTitle('TradeCRM API')
+		.setDescription('CRM for managing markets')
+		.setVersion('1.0')
+		.setContact('TradeCRM Team', '', 'support@tradecrm.com')
+		.addServer(
+			nodeEnv === 'production'
+				? 'https://trade-crm-api.vercel.app'
+				: 'http://localhost:4000',
+			nodeEnv === 'production' ? 'Production' : 'Development'
 		)
-	}
+		.addBearerAuth(
+			{ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+			'bearer'
+		)
+		.build()
+
+	const document = SwaggerModule.createDocument(app, swaggerConfig)
+	SwaggerModule.setup('api/docs', app, document, {
+		swaggerOptions: {
+			persistAuthorization: true,
+			docExpansion: 'list',
+			filter: true,
+			showRequestDuration: true,
+			syntaxHighlight: { theme: 'monokai' }
+		},
+		customSiteTitle: 'TradeCRM API Docs'
+	})
+
+	logger.log(
+		`Swagger docs: ${
+			nodeEnv === 'production' ? 'https://trade-crm-api.vercel.app' : `http://localhost:${configService.get('PORT', 3000)}`
+		}/api/docs`
+	)
 
 	const port = configService.get('PORT', 3000)
 	await app.listen(port)

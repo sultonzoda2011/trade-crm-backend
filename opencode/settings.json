@@ -1,0 +1,11 @@
+{
+	"provider": {
+		"deepseek": {
+			"options": {
+				"baseURL": "https://api.deepseek.com",
+				"apiKey": "sk-93afc46967604726aa4ad6a16fbfbef6"
+			}
+		}
+	},
+	"model": "deepseek/deepseek-v4-flash"
+}
