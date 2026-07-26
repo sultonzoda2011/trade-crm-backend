@@ -2,7 +2,6 @@ const { NestFactory } = require('@nestjs/core')
 const { ExpressAdapter } = require('@nestjs/platform-express')
 const { ValidationPipe } = require('@nestjs/common')
 const { SwaggerModule, DocumentBuilder } = require('@nestjs/swagger')
-const swaggerUi = require('swagger-ui-express')
 const express = require('express')
 
 const { AppModule } = require('../dist/src/app.module')
@@ -30,14 +29,19 @@ async function bootstrap() {
 						'https://localhost'
 					]
 				: ['http://localhost:5173', 'http://localhost:3000'],
-		credentials: true
+		credentials: true,
+		methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+		allowedHeaders: ['Content-Type', 'Authorization']
 	})
 
 	app.useGlobalPipes(
 		new ValidationPipe({
 			whitelist: true,
 			forbidNonWhitelisted: true,
-			transform: true
+			transform: true,
+			transformOptions: {
+				enableImplicitConversion: true
+			}
 		})
 	)
 
@@ -45,15 +49,26 @@ async function bootstrap() {
 		.setTitle('TradeCRM API')
 		.setDescription('CRM for managing markets')
 		.setVersion('1.0')
-		.addBearerAuth()
+		.addBearerAuth(
+			{
+				type: 'http',
+				scheme: 'bearer',
+				bearerFormat: 'JWT'
+			},
+			'bearer'
+		)
 		.build()
 
 	const document = SwaggerModule.createDocument(app, swaggerConfig)
 
-	// ВАЖНО: ручная отдача Swagger UI
-	server.use('/api/docs/', swaggerUi.serve, swaggerUi.setup(document))
-	server.get('/api/docs-json', (req, res) => {
-		res.json(document)
+	SwaggerModule.setup('docs', app, document, {
+		swaggerOptions: {
+			persistAuthorization: true,
+			docExpansion: 'list',
+			filter: true,
+			showRequestDuration: true
+		},
+		customSiteTitle: 'TradeCRM API Docs'
 	})
 
 	await app.init()
@@ -70,8 +85,8 @@ module.exports = async (req, res) => {
 		const app = await bootstrap()
 
 		app.getHttpAdapter().getInstance()(req, res)
-	} catch (err) {
-		console.error('Vercel handler error:', err)
+	} catch (error) {
+		console.error('Vercel handler error:', error)
 
 		res.status(500).json({
 			success: false,

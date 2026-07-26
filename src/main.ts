@@ -64,14 +64,18 @@ async function bootstrap() {
 			docExpansion: 'list',
 			filter: true,
 			showRequestDuration: true,
-			syntaxHighlight: { theme: 'monokai' }
+			syntaxHighlight: {
+				theme: 'monokai'
+			}
 		},
 		customSiteTitle: 'TradeCRM API Docs'
 	})
 
 	logger.log(
 		`Swagger docs: ${
-			nodeEnv === 'production' ? 'https://trade-crm-api.vercel.app' : `http://localhost:${configService.get('PORT', 3000)}`
+			nodeEnv === 'production'
+				? 'https://trade-crm-api.vercel.app'
+				: `http://localhost:${configService.get('PORT', 3000)}`
 		}/api/docs`
 	)
 
