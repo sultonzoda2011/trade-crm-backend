@@ -1,17 +1,14 @@
 const { NestFactory } = require('@nestjs/core')
 const { ExpressAdapter } = require('@nestjs/platform-express')
 const { ValidationPipe } = require('@nestjs/common')
-const { DocumentBuilder, SwaggerModule } = require('@nestjs/swagger')
-const path = require('path')
-const swaggerUi = require('swagger-ui-dist')
+const express = require('express')
+
+const { AppModule } = require('../dist/src/app.module')
 
 let cachedApp
 
 async function bootstrap() {
 	if (cachedApp) return cachedApp
-
-	const express = require('express')
-	const { AppModule } = require('../dist/src/app.module')
 
 	const app = await NestFactory.create(AppModule, new ExpressAdapter(express()))
 
@@ -42,67 +39,9 @@ async function bootstrap() {
 		})
 	)
 
-	const swaggerConfig = new DocumentBuilder()
-		.setTitle('TradeCRM API')
-		.setDescription('CRM for managing markets')
-		.setVersion('1.0')
-		.addServer('https://trade-crm-api.vercel.app', 'Production')
-		.addBearerAuth(
-			{ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-			'bearer'
-		)
-		.build()
-	const document = SwaggerModule.createDocument(app, swaggerConfig)
-
-	const expressApp = app.getHttpAdapter().getInstance()
-	const swaggerDistPath = swaggerUi.getAbsoluteFSPath()
-
-	expressApp.use('/api/docs', express.static(swaggerDistPath))
-	expressApp.use('/api/docs/swagger-ui-dist', express.static(swaggerDistPath))
-	expressApp.use('/api/swagger-ui-dist', express.static(swaggerDistPath))
-
-	expressApp.get('/api/docs', (req, res) => {
-		res.send(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <title>TradeCRM API Docs</title>
-        <link rel="stylesheet" href="/api/docs/swagger-ui-dist/swagger-ui.css">
-        <style>html { box-sizing: border-box; overflow-y: scroll; }</style>
-      </head>
-      <body>
-        <div id="swagger-ui"></div>
-        <script src="/api/docs/swagger-ui-dist/swagger-ui-bundle.js"></script>
-        <script src="/api/docs/swagger-ui-dist/swagger-ui-standalone-preset.js"></script>
-        <script>
-          window.onload = function() {
-            SwaggerUIBundle({
-              spec: ${JSON.stringify(document)},
-              dom_id: '#swagger-ui',
-              deepLinking: true,
-              presets: [
-                SwaggerUIBundle.presets.apis,
-                SwaggerUIStandalonePreset,
-              ],
-              plugins: [SwaggerUIBundle.plugins.DownloadUrl],
-              layout: 'StandaloneLayout',
-              docExpansion: 'list',
-              filter: true,
-              persistAuthorization: true,
-              showRequestDuration: true,
-              syntaxHighlight: { theme: 'monokai' },
-            });
-          };
-        </script>
-      </body>
-      </html>
-    `)
-	})
-
 	await app.init()
 	cachedApp = app
-	return cachedApp
+	return app
 }
 
 module.exports = async (req, res) => {

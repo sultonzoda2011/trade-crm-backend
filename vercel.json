@@ -2,8 +2,12 @@
 	"buildCommand": "npx prisma generate && npm run build",
 	"installCommand": "npm install --include=dev",
 	"outputDirectory": ".",
+	"functions": {
+		"api/index.js": {
+			"maxDuration": 30
+		}
+	},
 	"rewrites": [
-		{ "source": "/api/(.*)", "destination": "/api/$1" },
-		{ "source": "/(.*)", "destination": "/api/$1" }
+		{ "source": "/(.*)", "destination": "/api/index.js" }
 	]
 }
