@@ -7,3 +7,4 @@ package-lock.json
 prisma/generated/
 uploads/
 .vercel/
+.vercel
