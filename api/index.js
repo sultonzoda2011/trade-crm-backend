@@ -57,6 +57,7 @@ async function bootstrap() {
 	const expressApp = app.getHttpAdapter().getInstance()
 	const swaggerDistPath = swaggerUi.getAbsoluteFSPath()
 
+	expressApp.use('/api/docs', express.static(swaggerDistPath))
 	expressApp.use('/api/docs/swagger-ui-dist', express.static(swaggerDistPath))
 	expressApp.use('/api/swagger-ui-dist', express.static(swaggerDistPath))
 
