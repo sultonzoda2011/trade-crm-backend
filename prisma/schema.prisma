@@ -7,20 +7,20 @@ datasource db {
 }
 
 model User {
-  id             String         @id @default(uuid())
-  name           String
-  email          String         @unique
-  password       String
-  image          String?
-  role           Role
-  marketId       String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  transactions   Transaction[]
-  payments       Payment[]
-  market         Market?        @relation(fields: [marketId], references: [id])
-  ownedMarkets   Market[]       @relation("MarketOwner")
-  refreshTokens  RefreshToken[]
+  id            String         @id @default(uuid())
+  name          String
+  email         String         @unique
+  password      String
+  role          Role
+  marketId      String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  image         String?
+  ownedMarkets  Market[]       @relation("MarketOwner")
+  payments      Payment[]
+  refreshTokens RefreshToken[]
+  transactions  Transaction[]
+  market        Market?        @relation(fields: [marketId], references: [id])
 
   @@index([marketId])
 }
@@ -29,10 +29,10 @@ model RefreshToken {
   id        String    @id @default(uuid())
   token     String    @unique
   userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime  @default(now())
   revokedAt DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
@@ -42,14 +42,14 @@ model Market {
   id           String        @id @default(uuid())
   name         String
   address      String
-  image        String?
   ownerId      String
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
-  owner        User          @relation("MarketOwner", fields: [ownerId], references: [id])
-  debtors      Debtor[]
-  products     Product[]
+  image        String?
   categories   Category[]
+  debtors      Debtor[]
+  owner        User          @relation("MarketOwner", fields: [ownerId], references: [id])
+  products     Product[]
   transactions Transaction[]
   users        User[]
 }
@@ -57,33 +57,33 @@ model Market {
 model Category {
   id          String    @id @default(uuid())
   name        String
+  marketId    String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   description String?
   image       String?
-  marketId    String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  market    Market    @relation(fields: [marketId], references: [id], onDelete: Cascade)
-  products  Product[]
+  market      Market    @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  products    Product[]
 
-  @@index([marketId])
   @@unique([marketId, name])
+  @@index([marketId])
 }
 
 model Product {
   id                String            @id @default(uuid())
   name              String
-  description       String?
   price             Float
   quantity          Int
-  unit              ProductUnit       @default(PCS)
-  lowStockThreshold Int               @default(0)
-  image             String?
   marketId          String
-  categoryId        String?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
-  market            Market            @relation(fields: [marketId], references: [id])
+  image             String?
+  description       String?
+  categoryId        String?
+  lowStockThreshold Int               @default(0)
+  unit              ProductUnit       @default(PCS)
   category          Category?         @relation(fields: [categoryId], references: [id])
+  market            Market            @relation(fields: [marketId], references: [id])
   transactionItems  TransactionItem[]
 
   @@index([marketId])
@@ -108,23 +108,23 @@ model Transaction {
   marketId        String
   createdById     String
   debtorId        String?
-  refundOfId      String?           @unique
   type            TransactionType
   paymentType     PaymentType
   totalAmount     Float
-  discountAmount  Float             @default(0)
-  remainingAmount Float             @default(0)
   status          TransactionStatus
-  dueDate         DateTime?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
+  remainingAmount Float             @default(0)
+  discountAmount  Float             @default(0)
+  dueDate         DateTime?
+  refundOfId      String?           @unique
+  payments        Payment[]
   createdBy       User              @relation(fields: [createdById], references: [id])
   debtor          Debtor?           @relation(fields: [debtorId], references: [id])
   market          Market            @relation(fields: [marketId], references: [id])
   refundOf        Transaction?      @relation("TransactionRefund", fields: [refundOfId], references: [id])
   refund          Transaction?      @relation("TransactionRefund")
   items           TransactionItem[]
-  payments        Payment[]
 
   @@index([marketId])
   @@index([debtorId])
@@ -138,8 +138,8 @@ model TransactionItem {
   productName   String
   quantity      Int
   price         Float
-  discount      Float       @default(0)
   totalPrice    Float
+  discount      Float       @default(0)
   product       Product     @relation(fields: [productId], references: [id])
   transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
 
@@ -154,8 +154,8 @@ model Payment {
   note          String?
   createdById   String
   createdAt     DateTime    @default(now())
-  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
   createdBy     User        @relation(fields: [createdById], references: [id])
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
 
   @@index([transactionId])
   @@index([createdById])
