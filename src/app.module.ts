@@ -11,6 +11,7 @@ import { DebtorsModule } from './debtors/debtors.module'
 import { MarketsModule } from './markets/markets.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { ProductsModule } from './products/products.module'
+import { ProfileModule } from './profile/profile.module'
 import { SellersModule } from './sellers/sellers.module'
 import { TransactionsModule } from './transactions/transactions.module'
 import { UsersModule } from './users/users.module'
@@ -32,6 +33,7 @@ import { validate } from './config/env.validation'
 		MarketsModule,
 		CategoriesModule,
 		ProductsModule,
+		ProfileModule,
 		SellersModule,
 		DebtorsModule,
 		TransactionsModule,
