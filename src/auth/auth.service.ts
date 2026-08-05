@@ -1,7 +1,4 @@
-import {
-	Injectable,
-	UnauthorizedException
-} from '@nestjs/common'
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
 import { compare } from 'bcrypt'
@@ -13,6 +10,7 @@ import { AuthResponseDto } from './dto/auth-response.dto'
 @Injectable()
 export class AuthService {
 	private readonly refreshTokenExpiresIn: string
+	private readonly logger = new Logger(AuthService.name)
 
 	constructor(
 		private readonly prisma: PrismaService,
@@ -41,6 +39,7 @@ export class AuthService {
 			name: user.name,
 			email: user.email,
 			role: user.role,
+			image: user.image ?? undefined,
 			marketId: user.marketId ?? undefined
 		})
 	}
@@ -60,10 +59,10 @@ export class AuthService {
 		if (storedToken.revokedAt) {
 			// Токен уже был использован/отозван, но его снова пытаются применить —
 			// возможный признак кражи токена. Отзываем все refresh-токены пользователя.
-			await this.prisma.refreshToken.updateMany({
-				where: { userId: storedToken.userId, revokedAt: null },
-				data: { revokedAt: new Date() }
-			})
+			await this.revokeAllUserTokens(storedToken.userId)
+			this.logger.warn(
+				`Refresh token reuse detected for user ${storedToken.userId}`
+			)
 			throw new UnauthorizedException('Refresh token has been revoked')
 		}
 
@@ -71,10 +70,22 @@ export class AuthService {
 			throw new UnauthorizedException('Refresh token has expired')
 		}
 
-		await this.prisma.refreshToken.update({
-			where: { id: storedToken.id },
+		// Атомарное отозвание через updateMany с условием revokedAt: null. Если
+		// токен одновременно используют два запроса (гонка), ровно один из них
+		// обновит строку (count === 1), второй увидит count === 0 — повторное
+		// использование токена, отзываем всё у пользователя.
+		const rotated = await this.prisma.refreshToken.updateMany({
+			where: { id: storedToken.id, revokedAt: null },
 			data: { revokedAt: new Date() }
 		})
+
+		if (rotated.count === 0) {
+			await this.revokeAllUserTokens(storedToken.userId)
+			this.logger.warn(
+				`Concurrent refresh-token rotation for user ${storedToken.userId}`
+			)
+			throw new UnauthorizedException('Refresh token has been revoked')
+		}
 
 		return this.generateTokens(
 			storedToken.user.id,
@@ -107,6 +118,13 @@ export class AuthService {
 		})
 	}
 
+	private async revokeAllUserTokens(userId: string): Promise<void> {
+		await this.prisma.refreshToken.updateMany({
+			where: { userId, revokedAt: null },
+			data: { revokedAt: new Date() }
+		})
+	}
+
 	private async generateTokens(
 		userId: string,
 		email: string,
@@ -117,6 +135,7 @@ export class AuthService {
 			email: string
 			role: string
 			marketId?: string
+			image?: string
 		}
 	): Promise<AuthResponseDto> {
 		const payload: JwtPayload = {
@@ -124,7 +143,8 @@ export class AuthService {
 			name: user.name,
 			email: user.email,
 			role: role as any,
-			marketId: user.marketId
+			marketId: user.marketId,
+			id: user.id
 		}
 
 		const [accessToken, refreshTokenValue] = await Promise.all([
