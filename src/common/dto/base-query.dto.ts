@@ -1,4 +1,4 @@
-import { IsDateString, IsIn, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
+import { IsDateString, IsIn, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 
@@ -21,6 +21,7 @@ export class BaseQueryDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   search?: string
 
   @ApiPropertyOptional()
