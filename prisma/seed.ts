@@ -2,10 +2,55 @@ import 'dotenv/config'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient, ProductUnit } from './generated/client'
 import { hash } from 'bcrypt'
+import { v2 as cloudinary } from 'cloudinary'
+import { existsSync, readFileSync, readdirSync } from 'fs'
+import { join } from 'path'
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
 })
+
+const PNG_DIR = join(process.cwd(), 'prisma', 'png')
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+})
+
+const PNG_FILES = readdirSync(PNG_DIR)
+  .filter((f) => f.endsWith('.png'))
+  .sort()
+
+let imageIndex = 0
+
+function nextImage(): string | null {
+  if (PNG_FILES.length === 0) return null
+  const file = PNG_FILES[imageIndex % PNG_FILES.length]
+  imageIndex++
+  return file
+}
+
+const imageCache = new Map<string, string>()
+
+async function uploadImage(fileName: string | null): Promise<string | null> {
+  if (!fileName) return null
+  if (imageCache.has(fileName)) return imageCache.get(fileName)!
+  if (!process.env.CLOUDINARY_CLOUD_NAME) return null
+  const filePath = join(PNG_DIR, fileName)
+  if (!existsSync(filePath)) return null
+  const buffer = readFileSync(filePath)
+  const result = await cloudinary.uploader.upload(
+    `data:image/png;base64,${buffer.toString('base64')}`,
+    {
+      folder: 'tradecrm/seed',
+      public_id: fileName.replace(/\.[^.]+$/, ''),
+      resource_type: 'image',
+    },
+  )
+  imageCache.set(fileName, result.secure_url)
+  return result.secure_url
+}
 
 async function clearTables() {
   await prisma.payment.deleteMany()
@@ -28,6 +73,7 @@ async function createAdmin() {
       email: 'admin@tradecrm.com',
       password,
       role: 'ADMIN',
+      image: await uploadImage(nextImage()),
     },
   })
 }
@@ -41,17 +87,17 @@ interface MarketUsers {
 async function createMarket1(): Promise<MarketUsers> {
   const password = await hash('12345678Aa', 10)
   const owner = await prisma.user.create({
-    data: { name: 'Алишер Каримов', email: 'alisher@tradecrm.com', password, role: 'OWNER' },
+    data: { name: 'Алишер Каримов', email: 'alisher@tradecrm.com', password, role: 'OWNER', image: await uploadImage(nextImage()) },
   })
   const market = await prisma.market.create({
-    data: { name: 'Рынок Центральный', address: 'ул. Ленина, 15, г. Ташкент', ownerId: owner.id },
+    data: { name: 'Рынок Центральный', address: 'ул. Ленина, 15, г. Ташкент', ownerId: owner.id, image: await uploadImage(nextImage()) },
   })
   await prisma.user.update({ where: { id: owner.id }, data: { marketId: market.id } })
   const s1 = await prisma.user.create({
-    data: { name: 'Бахтияр Рахимов', email: 'bakhtiyar@tradecrm.com', password, role: 'SELLER', marketId: market.id },
+    data: { name: 'Бахтияр Рахимов', email: 'bakhtiyar@tradecrm.com', password, role: 'SELLER', marketId: market.id, image: await uploadImage(nextImage()) },
   })
   const s2 = await prisma.user.create({
-    data: { name: 'Мадина Юсупова', email: 'madina@tradecrm.com', password, role: 'SELLER', marketId: market.id },
+    data: { name: 'Мадина Юсупова', email: 'madina@tradecrm.com', password, role: 'SELLER', marketId: market.id, image: await uploadImage(nextImage()) },
   })
   return { market, owner, sellers: [s1, s2] }
 }
@@ -59,46 +105,51 @@ async function createMarket1(): Promise<MarketUsers> {
 async function createMarket2(): Promise<MarketUsers> {
   const password = await hash('12345678Aa', 10)
   const owner = await prisma.user.create({
-    data: { name: 'Дилноза Азимова', email: 'dilnoza@tradecrm.com', password, role: 'OWNER' },
+    data: { name: 'Дилноза Азимова', email: 'dilnoza@tradecrm.com', password, role: 'OWNER', image: await uploadImage(nextImage()) },
   })
   const market = await prisma.market.create({
-    data: { name: 'Рынок Восточный', address: 'ул. Амира Темура, 42, г. Ташкент', ownerId: owner.id },
+    data: { name: 'Рынок Восточный', address: 'ул. Амира Темура, 42, г. Ташкент', ownerId: owner.id, image: await uploadImage(nextImage()) },
   })
   await prisma.user.update({ where: { id: owner.id }, data: { marketId: market.id } })
   const s1 = await prisma.user.create({
-    data: { name: 'Жасур Ахмедов', email: 'jasur@tradecrm.com', password, role: 'SELLER', marketId: market.id },
+    data: { name: 'Жасур Ахмедов', email: 'jasur@tradecrm.com', password, role: 'SELLER', marketId: market.id, image: await uploadImage(nextImage()) },
   })
   const s2 = await prisma.user.create({
-    data: { name: 'Нигора Камилова', email: 'nigora@tradecrm.com', password, role: 'SELLER', marketId: market.id },
+    data: { name: 'Нигора Камилова', email: 'nigora@tradecrm.com', password, role: 'SELLER', marketId: market.id, image: await uploadImage(nextImage()) },
   })
   return { market, owner, sellers: [s1, s2] }
 }
 
-async function createCategories(marketId: string) {
-  const names = [
-    'Молочные продукты',
-    'Хлебобулочные изделия',
-    'Овощи и фрукты',
-    'Мясо и птица',
-    'Бакалея',
-  ]
+const categoryData1 = [
+  { name: 'Молочные продукты', description: 'Свежие молоко, йогурты, сыры и творог от местных ферм' },
+  { name: 'Хлебобулочные изделия', description: 'Свежая выпечка, хлеб и лепёшки каждый день' },
+  { name: 'Овощи и фрукты', description: 'Сезонные овощи и фрукты напрямую с базара' },
+  { name: 'Мясо и птица', description: 'Свежее мясо, птица и мясные полуфабрикаты' },
+  { name: 'Бакалея', description: 'Сахар, мука, масло и другие товары повседневного спроса' },
+]
+
+async function createCategories(marketId: string, list: typeof categoryData1) {
   return Promise.all(
-    names.map((name) => prisma.category.create({ data: { name, marketId } })),
+    list.map(async (c) =>
+      prisma.category.create({
+        data: {
+          name: c.name,
+          description: c.description,
+          marketId,
+          image: await uploadImage(nextImage()),
+        },
+      }),
+    ),
   )
 }
 
-async function createCategories2(marketId: string) {
-  const names = [
-    'Напитки',
-    'Кондитерские изделия',
-    'Морепродукты',
-    'Крупы и макароны',
-    'Консервация',
-  ]
-  return Promise.all(
-    names.map((name) => prisma.category.create({ data: { name, marketId } })),
-  )
-}
+const categoryData2 = [
+  { name: 'Напитки', description: 'Вода, соки, газированные и горячие напитки' },
+  { name: 'Кондитерские изделия', description: 'Шоколад, конфеты, зефир и другие сладости' },
+  { name: 'Морепродукты', description: 'Свежая и мороженая рыба, креветки и мидии' },
+  { name: 'Крупы и макароны', description: 'Крупы, макаронные изделия и бобовые' },
+  { name: 'Консервация', description: 'Консервы, маринады и томатная паста' },
+]
 
 const market1Products = [
   { name: 'Молоко свежее', description: 'Жирность 3.2%, 1л', price: 8000, unit: ProductUnit.L, quantity: 50 },
@@ -173,6 +224,7 @@ async function createAllProducts(marketId: string, categories: { id: string }[],
           marketId,
           categoryId: categories[i].id,
           lowStockThreshold: 5,
+          image: await uploadImage(nextImage()),
         },
       })
       products.push({ id: product.id, name: product.name, price: p.price })
@@ -360,8 +412,8 @@ async function main() {
   console.log(`  ✓ Рынок: ${m2.market.id}`)
 
   console.log('Создание категорий...')
-  const cats1 = await createCategories(m1.market.id)
-  const cats2 = await createCategories2(m2.market.id)
+  const cats1 = await createCategories(m1.market.id, categoryData1)
+  const cats2 = await createCategories(m2.market.id, categoryData2)
   console.log(`  ✓ Категории: ${cats1.length + cats2.length}`)
 
   console.log('Создание товаров...')
