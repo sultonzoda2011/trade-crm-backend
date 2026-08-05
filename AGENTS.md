@@ -11,8 +11,16 @@
 | `npm run prisma:migrate` | Apply pending migrations (dev) |
 | `npm run prisma:seed` | Seed DB via `ts-node prisma/seed.ts` |
 | `npm run prisma:studio` | Open Prisma Studio GUI |
+| `npm test` (or `npx jest`) | Run unit tests (jest + ts-jest) |
+| `npm run test:watch` | Run tests in watch mode |
+| `npm run test:cov` | Run tests with coverage |
+| `npx tsc --noEmit -p tsconfig.build.json` | Typecheck (full strict) |
 
-No tests exist (`jest` not even installed). There is no lint or typecheck script.
+## Testing
+
+- Unit tests use **jest + ts-jest** (`jest.config.js`), no DB access — Prisma is mocked.
+- Specs live next to sources as `*.spec.ts`; `tsconfig.build.json` excludes them from the build.
+- Coverage of critical logic: `auth.service` (login/refresh rotation/logout), `jwt.strategy` (caching), `transactions.service` (role/debtor/refund rules), `health.controller` (DB up/down).
 
 ## Prisma v7 + Postgres adapter
 
