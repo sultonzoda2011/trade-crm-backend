@@ -1,11 +1,12 @@
 import {
 	BadRequestException,
+	ForbiddenException,
 	Injectable,
 	NotFoundException,
 	UnauthorizedException
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { TransactionStatus, TransactionType } from '../enums'
+import { Role, TransactionStatus, TransactionType } from '../enums'
 import { JwtPayload } from '../interfaces'
 import { PaginatedResult } from '../common/dto/pagination.dto'
 import { buildDateWhere, buildOrderBy, paginate } from '../common/utils/paginate.util'
@@ -20,12 +21,12 @@ const transactionInclude = {
 			product: { select: { id: true, name: true, price: true, image: true } }
 		}
 	},
-	createdBy: { select: { id: true, name: true, email: true } },
+	createdBy: { select: { id: true, name: true, email: true , image: true } },
 	debtor: { select: { id: true, name: true, phone: true } },
 	market: { select: { id: true, name: true, address: true, image: true } },
 	payments: {
 		include: {
-			createdBy: { select: { id: true, name: true, email: true } }
+			createdBy: { select: { id: true, name: true, email: true , image: true } }
 		},
 		orderBy: { createdAt: 'desc' }
 	}
@@ -40,9 +41,36 @@ export class TransactionsService {
 		if (!marketId)
 			throw new UnauthorizedException('User is not assigned to a market')
 
+		// SELLER фиксирует только долги (DEBT). Обычные продажи за наличные
+		// оформляет OWNER/ADMIN — иначе продавец может бесконтрольно
+		// списывать товар со склада без долговой обязанности.
+		if (user.role === Role.SELLER && dto.type !== TransactionType.DEBT) {
+			throw new ForbiddenException(
+				'Sellers can only create DEBT transactions'
+			)
+		}
+
+		// DEBT без должника бессмыслен: не к кому будет предъявить долг.
+		if (dto.type === TransactionType.DEBT && !dto.debtorId) {
+			throw new BadRequestException('Debtor is required for DEBT transactions')
+		}
+
 		const productIds = [...new Set(dto.items.map(i => i.productId))]
 
 		return this.prisma.$transaction(async tx => {
+			// Должник обязан принадлежать маркету пользователя — иначе можно
+			// привязать долг к чужому должнику (IDOR).
+			if (dto.debtorId) {
+				const debtor = await tx.debtor.findUnique({
+					where: { id: dto.debtorId },
+					select: { marketId: true }
+				})
+				if (!debtor || debtor.marketId !== marketId) {
+					throw new BadRequestException(
+						'Debtor was not found in your market'
+					)
+				}
+			}
 			// Берём товары в рамках маркета пользователя, блокировкой строк через
 			// обычный SELECT (Prisma не даёт FOR UPDATE напрямую) — конкурентные
 			// продажи одного и того же товара обрабатываются через атомарный
@@ -155,7 +183,13 @@ export class TransactionsService {
 				this.prisma.transaction.findMany({
 					where,
 					include: transactionInclude,
-					orderBy: buildOrderBy(query.sortBy, query.sortOrder),
+					orderBy: buildOrderBy(query.sortBy, query.sortOrder, 'createdAt', [
+						'createdAt',
+						'totalAmount',
+						'status',
+						'type',
+						'updatedAt'
+					]),
 					skip,
 					take
 				}),
@@ -177,6 +211,17 @@ export class TransactionsService {
 
 	async update(id: string, dto: UpdateTransactionDto, userMarketId?: string) {
 		await this.findOne(id, userMarketId)
+
+		if (dto.debtorId && userMarketId) {
+			const debtor = await this.prisma.debtor.findUnique({
+				where: { id: dto.debtorId },
+				select: { marketId: true }
+			})
+			if (!debtor || debtor.marketId !== userMarketId) {
+				throw new BadRequestException('Debtor was not found in your market')
+			}
+		}
+
 		return this.prisma.transaction.update({
 			where: { id },
 			data: {
@@ -188,8 +233,29 @@ export class TransactionsService {
 	}
 
 	async remove(id: string, userMarketId?: string) {
-		await this.findOne(id, userMarketId)
-		await this.prisma.transaction.delete({ where: { id } })
+		const transaction = await this.findOne(id, userMarketId)
+
+		return this.prisma.$transaction(async tx => {
+			// SALE/DEBT списывали товар со склада при создании — при удалении
+			// возвращаем его обратно. REFUND, наоборот, возвращал товар на склад —
+			// при удалении списываем, чтобы не «раздуть» остатки.
+			const direction = transaction.type === TransactionType.REFUND ? -1 : 1
+
+			const items = await tx.transactionItem.findMany({
+				where: { transactionId: id }
+			})
+
+			for (const item of items) {
+				await tx.product.update({
+					where: { id: item.productId },
+					data: { quantity: { increment: item.quantity * direction } }
+				})
+			}
+
+			await tx.transaction.delete({
+				where: { id }
+			})
+		})
 	}
 
 	async pay(id: string, dto: CreatePaymentDto, user: JwtPayload) {
@@ -276,6 +342,14 @@ export class TransactionsService {
 		}
 		if (original.type === TransactionType.REFUND) {
 			throw new BadRequestException('Cannot refund a refund transaction')
+		}
+		if (original.type !== TransactionType.SALE) {
+			throw new BadRequestException('Only SALE transactions can be refunded')
+		}
+		if (original.status !== TransactionStatus.PAID) {
+			throw new BadRequestException(
+				'Only fully paid SALE transactions can be refunded'
+			)
 		}
 		if (original.refund) {
 			throw new BadRequestException('Transaction was already refunded')
