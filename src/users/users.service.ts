@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common'
 import { hash } from 'bcrypt'
 import { Express } from 'express'
+import { Role } from '../enums'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../common/services/storage.service'
 import { PaginatedResult } from '../common/dto/pagination.dto'
@@ -73,7 +74,12 @@ export class UsersService {
 			this.prisma.user.findMany({
 				where,
 				select: this.userSelect,
-				orderBy: buildOrderBy(query.sortBy, query.sortOrder),
+				orderBy: buildOrderBy(query.sortBy, query.sortOrder, 'createdAt', [
+					'createdAt',
+					'name',
+					'email',
+					'updatedAt'
+				]),
 				skip,
 				take
 			}),
@@ -92,6 +98,12 @@ export class UsersService {
 
 	async update(id: string, dto: UpdateUserDto, file?: Express.Multer.File) {
 		const user = await this.findOne(id)
+
+		// Нельзя снять последний админский аккаунт — иначе система останется
+		// без управления.
+		if (dto.role && user.role === Role.ADMIN && dto.role !== Role.ADMIN) {
+			await this.ensureNotLastAdmin(id)
+		}
 
 		if (dto.email) {
 			const existing = await this.prisma.user.findUnique({
@@ -120,9 +132,23 @@ export class UsersService {
 
 	async remove(id: string) {
 		const user = await this.findOne(id)
+		if (user.role === Role.ADMIN) {
+			await this.ensureNotLastAdmin(id)
+		}
 		if (user.image) {
 			await this.storageService.delete(user.image)
 		}
 		await this.prisma.user.delete({ where: { id } })
+	}
+
+	private async ensureNotLastAdmin(userId: string): Promise<void> {
+		const adminCount = await this.prisma.user.count({
+			where: { role: Role.ADMIN }
+		})
+		if (adminCount <= 1) {
+			throw new ConflictException(
+				'Cannot remove or demote the last admin account'
+			)
+		}
 	}
 }
