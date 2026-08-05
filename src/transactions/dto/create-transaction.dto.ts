@@ -4,6 +4,7 @@ import {
   IsArray,
   IsDateString,
   IsEnum,
+  IsInt,
   IsNumber,
   IsOptional,
   IsUUID,
@@ -19,7 +20,7 @@ class CreateTransactionItemDto {
   productId: string
 
   @ApiProperty({ example: 2 })
-  @IsNumber()
+  @IsInt()
   @Min(1)
   quantity: number
 
