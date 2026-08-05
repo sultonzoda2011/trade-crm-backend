@@ -3,8 +3,9 @@ dist/
 .env
 src/generated/
 *.tsbuildinfo
-package-lock.json
+coverage/
 prisma/generated/
 uploads/
 .vercel/
 .vercel
+PNG (transparent background)/
