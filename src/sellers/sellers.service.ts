@@ -77,7 +77,12 @@ export class SellersService {
 			this.prisma.user.findMany({
 				where,
 				select: sellerSelect,
-				orderBy: buildOrderBy(query.sortBy, query.sortOrder),
+				orderBy: buildOrderBy(query.sortBy, query.sortOrder, 'createdAt', [
+					'createdAt',
+					'name',
+					'email',
+					'updatedAt'
+				]),
 				skip,
 				take
 			}),
