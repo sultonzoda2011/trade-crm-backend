@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator'
+import { IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 export class CreateMarketDto {
@@ -16,6 +16,6 @@ export class CreateMarketDto {
 
   @ApiPropertyOptional({ description: 'Owner user ID (defaults to current user)' })
   @IsOptional()
-  @IsString()
+  @IsUUID()
   ownerId?: string
 }
