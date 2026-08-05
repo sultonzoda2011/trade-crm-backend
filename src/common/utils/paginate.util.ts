@@ -5,8 +5,22 @@ interface PaginationInput {
   limit?: number
 }
 
-export function buildOrderBy(sortBy?: string, sortOrder?: 'asc' | 'desc', defaultSortBy = 'createdAt'): Record<string, 'asc' | 'desc'> {
-  return { [sortBy || defaultSortBy]: sortOrder || 'desc' }
+/**
+ * Собирает orderBy. Неизвестные/неразрешённые sortBy молча заменяются на
+ * defaultSortBy — в orderBy нельзя передавать произвольные ключи: это защита
+ * от ошибок Prisma (P2025-класс) и от перечисления колонок через API.
+ */
+export function buildOrderBy(
+  sortBy?: string,
+  sortOrder?: 'asc' | 'desc',
+  defaultSortBy = 'createdAt',
+  allowedSortBy?: string[]
+): Record<string, 'asc' | 'desc'> {
+  const resolvedSortBy =
+    sortBy && (!allowedSortBy || allowedSortBy.includes(sortBy))
+      ? sortBy
+      : defaultSortBy
+  return { [resolvedSortBy]: sortOrder || 'desc' }
 }
 
 export function buildDateWhere(dateFrom?: string, dateTo?: string): { gte?: Date; lte?: Date } | undefined {
