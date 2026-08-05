@@ -40,7 +40,7 @@ export class CreateProductDto {
 
 	@ApiProperty({ example: 100, description: 'Available quantity (minimum 0)' })
 	@Type(() => Number)
-	@IsNumber()
+	@IsInt()
 	@Min(0)
 	quantity: number
 
