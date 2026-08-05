@@ -10,12 +10,14 @@ import { DashboardModule } from './dashboard/dashboard.module'
 import { DebtorsModule } from './debtors/debtors.module'
 import { MarketsModule } from './markets/markets.module'
 import { PrismaModule } from './prisma/prisma.module'
+import { PrismaService } from './prisma/prisma.service'
 import { ProductsModule } from './products/products.module'
 import { ProfileModule } from './profile/profile.module'
 import { SellersModule } from './sellers/sellers.module'
 import { TransactionsModule } from './transactions/transactions.module'
 import { UsersModule } from './users/users.module'
 import { validate } from './config/env.validation'
+import { PrismaThrottlerStorage } from './common/services/throttler-storage.service'
 
 @Module({
 	imports: [
@@ -25,7 +27,16 @@ import { validate } from './config/env.validation'
 		}),
 		// Общий лимит запросов на IP; /auth/login дополнительно защищён более
 		// строгим лимитом через @Throttle() на конкретном эндпоинте.
-		ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
+		// Хранилище — Postgres (PrismaThrottlerStorage), чтобы лимиты были
+		// корректны между инстансами и в serverless-среде.
+		ThrottlerModule.forRootAsync({
+			imports: [PrismaModule],
+			inject: [PrismaService],
+			useFactory: (prisma: PrismaService) => ({
+				throttlers: [{ ttl: 60_000, limit: 100 }],
+				storage: new PrismaThrottlerStorage(prisma)
+			})
+		}),
 		PrismaModule,
 		AuthModule,
 		CommonModule,
