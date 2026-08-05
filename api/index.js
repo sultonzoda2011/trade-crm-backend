@@ -2,6 +2,8 @@ const { NestFactory } = require('@nestjs/core')
 const { ExpressAdapter } = require('@nestjs/platform-express')
 const { ValidationPipe } = require('@nestjs/common')
 const { SwaggerModule, DocumentBuilder } = require('@nestjs/swagger')
+const compression = require('compression')
+const helmet = require('helmet')
 const express = require('express')
 
 const { AppModule } = require('../dist/src/app.module')
@@ -15,16 +17,37 @@ async function bootstrap() {
 
 	const app = await NestFactory.create(AppModule, new ExpressAdapter(server))
 
+	// За прокси (Vercel) req.ip иначе всегда адрес прокси — rate limiting по IP
+	// не работает и все пользователи делят один лимит.
+	app.set('trust proxy', 1)
+
+	// Базовые security-заголовки. CSP отключён: API отдаёт только JSON, а
+	// Swagger UI в dev использует инлайн-скрипты и CDN, что с CSP несовместимо.
+	app.use(helmet({ contentSecurityPolicy: false }))
+	app.use(compression())
+
+	// Лимит JSON-тела 100kb (мультипарт управляется в multerOptions, 5MB).
+	app.useBodyParser('json', { limit: '100kb' })
+
 	app.setGlobalPrefix('api')
 
+	const isProd = process.env.NODE_ENV === 'production'
+
+	// CORS: credentials:true требует явного списка origin (не '*'). В переключателе
+	// перечислены frontend (Vercel/Capacitor) и localhost для dev.
 	app.enableCors({
-		origin: '*',
-		credentials: true
+		origin: isProd
+			? ['https://trade-crm.vercel.app', 'capacitor://localhost']
+			: ['http://localhost:5173', 'http://localhost:3000'],
+		credentials: true,
+		methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+		allowedHeaders: ['Content-Type', 'Authorization']
 	})
 
 	app.useGlobalPipes(
 		new ValidationPipe({
 			whitelist: true,
+			forbidNonWhitelisted: true,
 			transform: true
 		})
 	)
@@ -38,13 +61,15 @@ async function bootstrap() {
 
 	const document = SwaggerModule.createDocument(app, config)
 
-	// только JSON
-	app
-		.getHttpAdapter()
-		.getInstance()
-		.get('/api/docs-json', (req, res) => {
-			res.json(document)
-		})
+	// Swagger только в dev-среде — в production документация API не отдаётся.
+	if (!isProd) {
+		// только JSON
+		app
+			.getHttpAdapter()
+			.getInstance()
+			.get('/api/docs-json', (req, res) => {
+				res.json(document)
+			})
 
 	// свой Swagger UI
 	app
@@ -88,6 +113,7 @@ dom_id:"#swagger-ui"
 </html>
 			`)
 		})
+	}
 
 	await app.init()
 
