@@ -85,9 +85,19 @@ export class ProfileService {
 			throw new BadRequestException('Current password is incorrect')
 		}
 
-		await this.prisma.user.update({
-			where: { id: userId },
-			data: { password: await hash(dto.newPassword, 10) }
+		await this.prisma.$transaction(async tx => {
+			await tx.user.update({
+				where: { id: userId },
+				data: { password: await hash(dto.newPassword, 10) }
+			})
+
+			// Смена пароля — признак возможного компрометации аккаунта: отзываем
+			// все активные refresh-токены, чтобы старые сессии не могли
+			// продлевать доступ под новым паролем.
+			await tx.refreshToken.updateMany({
+				where: { userId, revokedAt: null },
+				data: { revokedAt: new Date() }
+			})
 		})
 	}
 }
