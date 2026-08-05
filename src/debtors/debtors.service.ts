@@ -71,7 +71,12 @@ export class DebtorsService {
         this.prisma.debtor.findMany({
           where,
           include: debtorInclude,
-          orderBy: buildOrderBy(query.sortBy, query.sortOrder),
+          orderBy: buildOrderBy(query.sortBy, query.sortOrder, 'createdAt', [
+            'createdAt',
+            'name',
+            'phone',
+            'updatedAt'
+          ]),
           skip,
           take,
         }),
