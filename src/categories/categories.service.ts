@@ -36,7 +36,11 @@ export class CategoriesService {
       this.prisma.category.findMany({
         where,
         include: { _count: { select: { products: true } } },
-        orderBy: buildOrderBy(query.sortBy, query.sortOrder, 'name'),
+        orderBy: buildOrderBy(query.sortBy, query.sortOrder, 'name', [
+          'createdAt',
+          'name',
+          'updatedAt'
+        ]),
         skip,
         take,
       }),
