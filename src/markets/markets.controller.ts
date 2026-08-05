@@ -1,24 +1,26 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger'
-import { Role } from '../enums'
-import { Roles } from '../auth/decorators/roles.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
-import { JwtPayload } from '../interfaces'
-import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe'
+import { Roles } from '../auth/decorators/roles.decorator'
 import { ApiErrorResponse } from '../common/decorators/api-error-response.decorator'
-import { multerOptions } from '../common/utils/multipart.util'
-import { MarketsService } from './markets.service'
-import { CreateMarketDto } from './dto/create-market.dto'
-import { UpdateMarketDto } from './dto/update-market.dto'
-import { QueryMarketDto } from './dto/query-market.dto'
-import { MarketResponseDto } from './dto/market-response.dto'
 import { PaginatedResult } from '../common/dto/pagination.dto'
-import { Express } from 'express'
+import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe'
+import { multerOptions } from '../common/utils/multipart.util'
+import { Role } from '../enums'
+import { JwtPayload } from '../interfaces'
+import { CreateMarketDto } from './dto/create-market.dto'
+import { MarketResponseDto } from './dto/market-response.dto'
+import { QueryMarketDto } from './dto/query-market.dto'
+import { UpdateMarketDto } from './dto/update-market.dto'
+import { MarketsService } from './markets.service'
 
 @ApiTags('Markets')
 @ApiBearerAuth()
 @ApiErrorResponse()
+// Чтение доступно ADMIN (все маркеты) и OWNER (только свой); SELLER закрыт.
+// Управляющие методы переопределены ниже через @Roles(Role.ADMIN).
+@Roles(Role.ADMIN, Role.OWNER)
 @Controller('markets')
 export class MarketsController {
   constructor(private readonly marketsService: MarketsService) {}
@@ -56,21 +58,22 @@ export class MarketsController {
   @ApiQuery({ name: 'search', required: false, description: 'Search by name or address' })
   @ApiQuery({ name: 'page', required: false, example: 1, description: 'Page number (1-based)' })
   @ApiQuery({ name: 'limit', required: false, example: 20, description: 'Items per page (max 100)' })
-  findAll(@Query() query: QueryMarketDto): Promise<PaginatedResult<unknown>> {
-    return this.marketsService.findAll(query)
+  findAll(@Query() query: QueryMarketDto, @CurrentUser() user: JwtPayload): Promise<PaginatedResult<unknown>> {
+    // ADMIN видит все маркеты; OWNER — только свой.
+    return this.marketsService.findAll(query, user.role === Role.OWNER ? user.marketId : undefined)
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a market by ID', description: 'Returns a single market with full details.' })
   @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Market ID' })
   @ApiOkResponse({ type: MarketResponseDto, description: 'The found market' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.marketsService.findOne(id)
+  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+    return this.marketsService.findOne(id, user.role === Role.OWNER ? user.marketId : undefined)
   }
 
   @Patch(':id')
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Update a market', description: 'Updates a market with partial data and an optional new image. Admin only.' })
+  @Roles(Role.ADMIN, Role.OWNER)
+  @ApiOperation({ summary: 'Update a market', description: 'Updates a market with partial data and an optional new image. Admin or the owner of the market.' })
   @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Market ID' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -91,8 +94,10 @@ export class MarketsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateMarketDto,
     @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.marketsService.update(id, dto, file)
+    // OWNER может обновлять только свой маркет (IDOR-защита).
+    return this.marketsService.update(id, dto, file, user.role === Role.OWNER ? user.marketId : undefined)
   }
 
   @Delete(':id')
@@ -100,7 +105,7 @@ export class MarketsController {
   @ApiOperation({ summary: 'Delete a market', description: 'Deletes a market and its associated image. Admin only.' })
   @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Market ID' })
   @ApiOkResponse({ description: 'Market successfully deleted' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.marketsService.remove(id)
+  remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+    return this.marketsService.remove(id, user.role === Role.OWNER ? user.marketId : undefined)
   }
 }
