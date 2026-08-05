@@ -21,11 +21,9 @@ import { PaginatedResult } from '../common/dto/pagination.dto'
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 
-  // Любая роль (ADMIN/OWNER/SELLER) может создавать транзакцию — в том числе
-  // SELLER, но только DEBT-тип имеет для него смысл; полноценная проверка
-  // "SELLER может только DEBT" выполняется в сервисе бизнес-правилами проекта,
-  // здесь ограничиваем именно управляющие операции (удаление, произвольный SALE
-  // остаётся доступен ADMIN/OWNER).
+  // Любая роль (ADMIN/OWNER/SELLER) может создавать транзакцию. Проверка
+  // "SELLER может создавать только DEBT" выполняется в сервисе — это блокирует
+  // бесконтрольное списание товара со склада продавцом без долговой обязанности.
   @Post()
   @ApiCreatedResponse({ type: TransactionResponseDto })
   create(@Body() dto: CreateTransactionDto, @CurrentUser() user: JwtPayload) {
