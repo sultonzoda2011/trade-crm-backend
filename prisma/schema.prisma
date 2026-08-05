@@ -161,6 +161,18 @@ model Payment {
   @@index([createdById])
 }
 
+// Персистентное хранилище rate limiting (PrismaThrottlerStorage).
+// Одна строка на ключ «throttler:controller:handler:ip»; hits обновляются
+// атомарно через INSERT ... ON CONFLICT в PrismaThrottlerStorage.
+model ThrottleBucket {
+  key          String    @id
+  hits         Int
+  expiresAt    DateTime
+  blockedUntil DateTime?
+
+  @@index([expiresAt])
+}
+
 enum Role {
   ADMIN
   OWNER
