@@ -3,7 +3,9 @@ import {
 	Injectable,
 	NotFoundException
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { hash } from 'bcrypt'
+import { Prisma } from '@prisma/client'
 import { Express } from 'express'
 import { Role } from '../enums'
 import { PrismaService } from '../prisma/prisma.service'
@@ -19,6 +21,7 @@ export class UsersService {
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly storageService: StorageService,
+		private readonly configService: ConfigService
 	) {}
 
 	private userSelect = {
@@ -39,7 +42,8 @@ export class UsersService {
 		})
 		if (existing) throw new ConflictException('Email already in use')
 
-		const hashed = await hash(dto.password, 10)
+		const bcryptRounds = this.configService.get<number>('BCRYPT_ROUNDS') ?? 12
+		const hashed = await hash(dto.password, bcryptRounds)
 		const image = file ? await this.storageService.save(file, 'users') : undefined
 
 		return this.prisma.user.create({
@@ -55,7 +59,7 @@ export class UsersService {
 	}
 
 	async findAll(query: QueryUserDto): Promise<PaginatedResult<unknown>> {
-		const where: any = {}
+		const where: Prisma.UserWhereInput = {}
 
 		if (query.role) where.role = query.role
 		if (query.marketId) where.marketId = query.marketId
@@ -114,7 +118,10 @@ export class UsersService {
 		}
 
 		const data: any = { ...dto }
-		if (dto.password) data.password = await hash(dto.password, 10)
+		if (dto.password) {
+			const bcryptRounds = this.configService.get<number>('BCRYPT_ROUNDS') ?? 12
+			data.password = await hash(dto.password, bcryptRounds)
+		}
 
 		if (file) {
 			if (user.image) {
