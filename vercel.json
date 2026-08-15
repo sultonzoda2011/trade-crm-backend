@@ -3,8 +3,7 @@
 	"installCommand": "npm install --include=dev",
 	"functions": {
 		"api/index.ts": {
-			"maxDuration": 30,
-			"runtime": "nodejs20.x"
+			"maxDuration": 30
 		}
 	},
 	"rewrites": [
