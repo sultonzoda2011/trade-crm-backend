@@ -113,6 +113,31 @@ export class TopDebtorDto {
   activeTransactions: number
 }
 
+export class RevenueTrendDto {
+  @ApiProperty({ description: 'Date (YYYY-MM-DD); for YEAR period — month start' })
+  date: string
+
+  @ApiProperty({ description: 'Total SALE amount' })
+  revenue: number
+
+  @ApiProperty()
+  transactionCount: number
+}
+
+export class PaymentTypeDistributionDto {
+  @ApiProperty({ enum: ['CASH', 'CARD', 'CREDIT'] })
+  type: string
+
+  @ApiProperty()
+  count: number
+
+  @ApiProperty()
+  amount: number
+
+  @ApiProperty({ description: 'Share of total amount, one decimal' })
+  percentage: number
+}
+
 export class DashboardResponseDto {
   @ApiProperty({ type: StatsDto })
   stats: StatsDto
@@ -122,4 +147,10 @@ export class DashboardResponseDto {
 
   @ApiProperty({ type: [TopDebtorDto] })
   topDebtors: TopDebtorDto[]
+
+  @ApiProperty({ type: [RevenueTrendDto] })
+  revenueTrend: RevenueTrendDto[]
+
+  @ApiProperty({ type: [PaymentTypeDistributionDto] })
+  paymentDistribution: PaymentTypeDistributionDto[]
 }
