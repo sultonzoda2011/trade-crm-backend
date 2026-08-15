@@ -81,6 +81,9 @@ export class TransactionResponseDto {
   @ApiPropertyOptional()
   debtorId?: string
 
+  @ApiPropertyOptional({ description: 'Optional customer name for a SALE transaction ("who it was sold to")' })
+  customerName?: string
+
   @ApiProperty()
   type: string
 
