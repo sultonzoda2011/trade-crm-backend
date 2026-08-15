@@ -14,6 +14,7 @@ import { UpdateProductDto } from './dto/update-product.dto'
 import { QueryProductDto } from './dto/query-product.dto'
 import { ProductResponseDto } from './dto/product-response.dto'
 import { PaginatedResult } from '../common/dto/pagination.dto'
+import { AnalyticsPeriod, PeriodQueryDto } from '../common/dto/period-query.dto'
 import { Express } from 'express'
 
 // SELLER по бизнес-требованиям проекта не имеет доступа к складу/товарам —
@@ -53,8 +54,14 @@ export class ProductsController {
     return this.productsService.create(dto, file, user.marketId)
   }
 
+  // Каждый товар в выдаче обогащается метриками за период (скорость продаж,
+  // запас в днях, возвраты, срочность закупки) — фронтенд их не считает.
   @Get()
-  @ApiOperation({ summary: 'List products', description: 'Returns a paginated list of products for the current user\'s market.' })
+  @ApiOperation({
+    summary: 'List products with business metrics',
+    description:
+      "Returns a paginated list of products for the current user's market, each enriched with sales velocity, days of stock, return rate, health and reorder priority.",
+  })
   @ApiOkResponse({ type: ProductResponseDto })
   @ApiQuery({ name: 'search', required: false, description: 'Search by product name' })
   @ApiQuery({ name: 'page', required: false, example: 1, description: 'Page number (1-based)' })
@@ -64,11 +71,16 @@ export class ProductsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get a product by ID', description: 'Returns a single product with full details.' })
+  @ApiOperation({ summary: 'Get a product by ID', description: 'Returns a single product with full details, period metrics and period-over-period comparison.' })
   @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Product ID' })
+  @ApiQuery({ name: 'period', required: false, enum: AnalyticsPeriod, description: 'Metrics window. Default: month' })
   @ApiOkResponse({ type: ProductResponseDto, description: 'The found product' })
-  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
-    return this.productsService.findOne(id, user.marketId)
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: JwtPayload,
+    @Query() query: PeriodQueryDto,
+  ) {
+    return this.productsService.findOne(id, user.marketId, query.period)
   }
 
   @Patch(':id')
