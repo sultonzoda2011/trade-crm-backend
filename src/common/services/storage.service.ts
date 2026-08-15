@@ -28,7 +28,9 @@ function extractPublicId(secureUrl: string): string {
   if (uploadIndex === -1) {
     throw new Error('Invalid Cloudinary URL')
   }
-  const rest = parts.slice(uploadIndex + 1).filter(p => !p.startsWith('v')).join('/')
+  // Фильтруем только сегмент с версией вида "v123456", а не любой путь,
+  // начинающийся с "v" (например, папка "videos" или "v2-products").
+  const rest = parts.slice(uploadIndex + 1).filter(p => !/^v\d+$/.test(p)).join('/')
   return rest.replace(/\.[^.]+$/, '')
 }
 
