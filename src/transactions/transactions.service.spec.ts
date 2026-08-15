@@ -263,7 +263,8 @@ prisma.$transaction.mockImplementation((cb: any) =>
 					quantity: 2,
 					price: 100,
 					discount: 0,
-					totalPrice: 200
+					totalPrice: 200,
+					refundedQuantity: 0
 				}
 			]
 		}
@@ -311,7 +312,7 @@ prisma.$transaction.mockImplementation((cb: any) =>
 		it('throws if already refunded', async () => {
 			prisma.transaction.findUnique.mockResolvedValue({
 				...paidSale,
-				refund: { id: 'refund-1' }
+				items: [{ ...paidSale.items[0], refundedQuantity: 2 }]
 			})
 			await expect(
 				service.refund('sale-1', ownerUser)
@@ -322,6 +323,9 @@ prisma.$transaction.mockImplementation((cb: any) =>
 			prisma.transaction.findUnique.mockResolvedValue(paidSale)
 			const tx = {
 				product: { update: jest.fn().mockResolvedValue({}) },
+				transactionItem: {
+					updateMany: jest.fn().mockResolvedValue({ count: 1 })
+				},
 				transaction: {
 					create: jest
 						.fn()
