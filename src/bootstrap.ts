@@ -21,8 +21,7 @@ export function configureApp(app: NestExpressApplication): void {
 	// не работает и все пользователи делят один лимит. 1 = доверяем первому
 	// hop'у X-Forwarded-For.
 	app.set('trust proxy', 1)
-
-	// Нужен для чтения httpOnly cookie с refresh-токеном в AuthController.
+	// Нужен для чтения httpOnly cookie с accessToken в AuthController.
 	app.use(cookieParser())
 
 	// Базовые security-заголовки. CSP отключён: API отдаёт только JSON, а
