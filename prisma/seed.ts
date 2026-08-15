@@ -11,7 +11,6 @@ async function clearTables() {
 	await prisma.payment.deleteMany()
 	await prisma.transactionItem.deleteMany()
 	await prisma.transaction.deleteMany()
-	await prisma.refreshToken.deleteMany()
 	await prisma.product.deleteMany()
 	await prisma.category.deleteMany()
 	await prisma.debtor.deleteMany()
