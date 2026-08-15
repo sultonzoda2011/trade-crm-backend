@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config'
 import {
 	ConflictException,
 	Injectable,
@@ -5,6 +6,7 @@ import {
 	UnauthorizedException
 } from '@nestjs/common'
 import { hash } from 'bcrypt'
+import { Prisma } from '@prisma/client'
 import { Express } from 'express'
 import { PaginatedResult } from '../common/dto/pagination.dto'
 import { PrismaService } from '../prisma/prisma.service'
@@ -31,6 +33,7 @@ export class SellersService {
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly storageService: StorageService,
+		private readonly configService: ConfigService
 	) {}
 
 	async create(dto: CreateSellerDto, file?: Express.Multer.File, marketId?: string) {
@@ -42,7 +45,8 @@ export class SellersService {
 		})
 		if (existing) throw new ConflictException('Email already in use')
 
-		const hashedPassword = await hash(dto.password, 10)
+		const bcryptRounds = this.configService.get<number>('BCRYPT_ROUNDS') ?? 12
+		const hashedPassword = await hash(dto.password, bcryptRounds)
 		const image = file ? await this.storageService.save(file, 'sellers') : undefined
 
 		return this.prisma.user.create({
@@ -62,7 +66,7 @@ export class SellersService {
 		query: QuerySellerDto,
 		marketId?: string
 	): Promise<PaginatedResult<unknown>> {
-		const where: any = { role: 'SELLER' }
+		const where: Prisma.UserWhereInput = { role: 'SELLER' }
 		if (marketId) where.marketId = marketId
 
 		if (query.search) {
@@ -91,7 +95,7 @@ export class SellersService {
 	}
 
 	async findOne(id: string, marketId?: string) {
-		const where: any = { id, role: 'SELLER' }
+		const where: Prisma.UserWhereInput = { id, role: 'SELLER' }
 		if (marketId) where.marketId = marketId
 
 		const seller = await this.prisma.user.findFirst({
@@ -114,7 +118,10 @@ export class SellersService {
 		}
 
 		const data: any = { ...dto }
-		if (dto.password) data.password = await hash(dto.password, 10)
+		if (dto.password) {
+			const bcryptRounds = this.configService.get<number>('BCRYPT_ROUNDS') ?? 12
+			data.password = await hash(dto.password, bcryptRounds)
+		}
 
 		if (file) {
 			if (seller.image) {
