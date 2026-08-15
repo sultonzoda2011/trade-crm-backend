@@ -4,6 +4,7 @@ import { HealthModule } from './health/health.module'
 import { APP_GUARD } from '@nestjs/core'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import { AuthModule } from './auth/auth.module'
+import { AnalyticsModule } from './analytics/analytics.module'
 import { CategoriesModule } from './categories/categories.module'
 import { CommonModule } from './common/common.module'
 import { DashboardModule } from './dashboard/dashboard.module'
@@ -40,6 +41,7 @@ import { PrismaThrottlerStorage } from './common/services/throttler-storage.serv
 		PrismaModule,
 		AuthModule,
 		CommonModule,
+		AnalyticsModule,
 		UsersModule,
 		MarketsModule,
 		CategoriesModule,
