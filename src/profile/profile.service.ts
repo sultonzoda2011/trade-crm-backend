@@ -91,13 +91,7 @@ export class ProfileService {
 				data: { password: await hash(dto.newPassword, 10) }
 			})
 
-			// Смена пароля — признак возможного компрометации аккаунта: отзываем
-			// все активные refresh-токены, чтобы старые сессии не могли
-			// продлевать доступ под новым паролем.
-			await tx.refreshToken.updateMany({
-				where: { userId, revokedAt: null },
-				data: { revokedAt: new Date() }
-			})
+	
 		})
 	}
 }
