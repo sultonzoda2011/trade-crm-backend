@@ -6,6 +6,7 @@ describe('UsersService (last admin protection)', () => {
 	let service: UsersService
 	let prisma: any
 	let storageService: any
+	let configService: any
 
 	const adminRow = {
 		id: 'admin-1',
@@ -30,7 +31,8 @@ describe('UsersService (last admin protection)', () => {
 			save: jest.fn(),
 			delete: jest.fn()
 		}
-		service = new UsersService(prisma, storageService)
+		configService = { get: jest.fn().mockReturnValue(12) }
+		service = new UsersService(prisma, storageService, configService)
 	})
 
 	describe('remove', () => {
