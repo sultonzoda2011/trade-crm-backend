@@ -26,7 +26,6 @@ export class AuthResponseDto {
    * перехватывает это значение, выставляет как httpOnly cookie
    * и НЕ возвращает клиенту в теле ответа.
    */
-  refreshToken: string
 
   @ApiProperty({ type: AuthUserDto })
   user: AuthUserDto
