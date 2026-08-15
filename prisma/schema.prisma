@@ -18,25 +18,13 @@ model User {
   image         String?
   ownedMarkets  Market[]       @relation("MarketOwner")
   payments      Payment[]
-  refreshTokens RefreshToken[]
   transactions  Transaction[]
   market        Market?        @relation(fields: [marketId], references: [id])
 
   @@index([marketId])
 }
 
-model RefreshToken {
-  id        String    @id @default(uuid())
-  token     String    @unique
-  userId    String
-  expiresAt DateTime
-  createdAt DateTime  @default(now())
-  revokedAt DateTime?
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
-  @@index([token])
-}
 
 model Market {
   id           String        @id @default(uuid())
