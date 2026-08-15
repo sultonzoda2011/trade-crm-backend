@@ -11,8 +11,12 @@ export class PrismaService
 	private readonly logger = new Logger(PrismaService.name)
 
 	constructor() {
+		// Пул лимитируется из env: в serverless (Vercel) каждый инстанс держит
+		// свой пул, поэтому max нужно задавать небольшим (например 2-3).
+		// Локально/на проде-процессе дефолт 10.
 		const adapter = new PrismaPg({
-			connectionString: process.env.DATABASE_URL!
+			connectionString: process.env.DATABASE_URL!,
+			max: Number(process.env.DATABASE_POOL_MAX ?? 10)
 		})
 
 		super({
