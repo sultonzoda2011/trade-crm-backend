@@ -21,7 +21,7 @@ class EnvironmentVariables {
  
 
   @IsString()
-  JWT_ACCESS_EXPIRES_IN: string = '15m'
+  JWT_ACCESS_EXPIRES_IN: string
 
 
   @IsNumber()
