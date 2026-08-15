@@ -11,6 +11,7 @@ import { CreateTransactionDto } from './dto/create-transaction.dto'
 import { CreatePaymentDto } from './dto/create-payment.dto'
 import { UpdateTransactionDto } from './dto/update-transaction.dto'
 import { QueryTransactionDto } from './dto/query-transaction.dto'
+import { RefundTransactionDto } from './dto/refund-transaction.dto'
 import { TransactionResponseDto } from './dto/transaction-response.dto'
 import { PaginatedResult } from '../common/dto/pagination.dto'
 
@@ -34,7 +35,11 @@ export class TransactionsController {
   @ApiOkResponse({ type: TransactionResponseDto })
   @ApiQuery({ name: 'debtorId', required: false })
   @ApiQuery({ name: 'type', required: false, enum: ['SALE', 'DEBT', 'REFUND'] })
-  @ApiQuery({ name: 'status', required: false, enum: ['PAID', 'ACTIVE', 'PARTIAL', 'REFUNDED'] })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['PAID', 'ACTIVE', 'PARTIAL', 'REFUNDED', 'PARTIALLY_REFUNDED'],
+  })
   @ApiQuery({ name: 'dateFrom', required: false })
   @ApiQuery({ name: 'dateTo', required: false })
   @ApiQuery({ name: 'page', required: false, example: 1 })
@@ -49,6 +54,14 @@ export class TransactionsController {
     // ВАЖНО: marketId обязательно передаётся, иначе любой пользователь
     // может прочитать транзакцию чужого маркета по id (IDOR).
     return this.transactionsService.findOne(id, user.marketId)
+  }
+
+  // Транзакция как бизнес-процесс: строки с остатком к возврату, платежи,
+  // возвраты, связь с исходной продажей и единый timeline событий.
+  @Get(':id/detail')
+  @ApiOkResponse({ description: 'Transaction with payments, refunds and event timeline' })
+  findOneDetail(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+    return this.transactionsService.findOneDetail(id, user.marketId)
   }
 
   @Patch(':id')
@@ -79,10 +92,16 @@ export class TransactionsController {
     return this.transactionsService.pay(id, dto, user)
   }
 
+  // Частичный возврат: в теле передаются конкретные строки продажи и количество.
+  // Пустое тело сохраняет прежнее поведение — возврат всего остатка целиком.
   @Post(':id/refund')
   @Roles(Role.ADMIN, Role.OWNER)
   @ApiOkResponse({ type: TransactionResponseDto, description: 'Refund created, stock restored' })
-  refund(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
-    return this.transactionsService.refund(id, user)
+  refund(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RefundTransactionDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.transactionsService.refund(id, user, dto)
   }
 }
