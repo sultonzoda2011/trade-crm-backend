@@ -2,7 +2,12 @@ import { IsEnum, IsNumber, IsOptional, IsUUID, Min } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { BaseQueryDto } from '../../common/dto/base-query.dto'
-import { PaymentType, TransactionStatus, TransactionType } from '../../enums'
+import {
+  DebtStatusFilter,
+  PaymentType,
+  TransactionStatus,
+  TransactionType,
+} from '../../enums'
 
 export class QueryTransactionDto extends BaseQueryDto {
   @ApiPropertyOptional()
@@ -53,4 +58,13 @@ export class QueryTransactionDto extends BaseQueryDto {
   @IsNumber()
   @Min(0)
   maxAmount?: number
+
+  @ApiPropertyOptional({
+    enum: DebtStatusFilter,
+    description:
+      'Filter debts by their settlement state. Derived from status and dueDate at request time, so it always reflects "overdue right now" rather than a stored flag. Implies type=DEBT.',
+  })
+  @IsOptional()
+  @IsEnum(DebtStatusFilter)
+  debtStatus?: DebtStatusFilter
 }
