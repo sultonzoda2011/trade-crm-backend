@@ -41,7 +41,8 @@ export async function paginate<T>(
   fetchTotal: () => Promise<number>,
 ): Promise<PaginatedResult<T>> {
   const resolvedPage = page ?? 1
-  const resolvedLimit = limit ?? 20
+  // Жёсткий потолок: предотвращает ?limit=999999 и OOM-запросы
+  const resolvedLimit = Math.min(limit ?? 20, 100)
   const skip = (resolvedPage - 1) * resolvedLimit
 
   const [data, total] = await Promise.all([
