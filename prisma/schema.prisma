@@ -117,18 +117,24 @@ model Transaction {
   remainingAmount Float             @default(0)
   discountAmount  Float             @default(0)
   dueDate         DateTime?
-  refundOfId      String?           @unique
+  // Одна SALE может иметь НЕСКОЛЬКО частичных возвратов, поэтому здесь нет
+  // @unique. Ограничение «нельзя вернуть больше купленного» держится на
+  // TransactionItem.refundedQuantity, а не на уникальности этой связи.
+  refundOfId      String?
   payments        Payment[]
   createdBy       User              @relation(fields: [createdById], references: [id])
   debtor          Debtor?           @relation(fields: [debtorId], references: [id])
   market          Market            @relation(fields: [marketId], references: [id])
   refundOf        Transaction?      @relation("TransactionRefund", fields: [refundOfId], references: [id])
-  refund          Transaction?      @relation("TransactionRefund")
+  refunds         Transaction[]     @relation("TransactionRefund")
   items           TransactionItem[]
 
   @@index([marketId])
   @@index([debtorId])
   @@index([createdById])
+  @@index([refundOfId])
+  @@index([marketId, type, createdAt])
+  @@index([createdById, type, createdAt])
 }
 
 model TransactionItem {
@@ -140,11 +146,21 @@ model TransactionItem {
   price         Float
   totalPrice    Float
   discount      Float       @default(0)
+  // Сколько единиц этой строки уже возвращено. Растёт при каждом частичном
+  // возврате и служит единственным источником правды для проверки
+  // «нельзя вернуть больше купленного». На строках REFUND-транзакций всегда 0.
+  refundedQuantity Int      @default(0)
+  // Ссылка со строки REFUND на исходную строку SALE — позволяет посчитать
+  // возвраты в разрезе конкретной покупки, а не только товара.
+  refundOfItemId String?
+  refundOfItem   TransactionItem?  @relation("TransactionItemRefund", fields: [refundOfItemId], references: [id])
+  refundItems    TransactionItem[] @relation("TransactionItemRefund")
   product       Product     @relation(fields: [productId], references: [id])
   transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
 
   @@index([transactionId])
   @@index([productId])
+  @@index([refundOfItemId])
 }
 
 model Payment {
@@ -196,6 +212,7 @@ enum TransactionStatus {
   ACTIVE
   PARTIAL
   REFUNDED
+  PARTIALLY_REFUNDED
 }
 
 enum ProductUnit {
