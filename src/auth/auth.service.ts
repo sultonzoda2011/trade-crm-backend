@@ -34,7 +34,7 @@ export class AuthService {
 			throw new UnauthorizedException('Invalid email or password')
 		}
 
-		return this.generateTokens(user.id, user.email, user.role as any, {
+		const result = await this.generateTokens(user.id, user.email, user.role as any, {
 			id: user.id,
 			name: user.name,
 			email: user.email,
@@ -42,6 +42,28 @@ export class AuthService {
 			image: user.image ?? undefined,
 			marketId: user.marketId ?? undefined
 		})
+
+		// Фоновая очистка истёкших refresh-токенов пользователя + ThrottleBucket.
+		// Fire-and-forget: не блокируем ответ логина, ошибки не критичны.
+		this.cleanupExpiredTokens(user.id).catch(err =>
+			this.logger.warn(`Expired token cleanup failed for user ${user.id}: ${err.message}`)
+		)
+
+		return result
+	}
+
+	private async cleanupExpiredTokens(userId: string): Promise<void> {
+		const now = new Date()
+		await Promise.all([
+			// Очистка просроченных refresh-токенов пользователя
+			this.prisma.refreshToken.deleteMany({
+				where: { userId, expiresAt: { lt: now } }
+			}),
+			// Очистка просроченных ThrottleBucket (глобально, ограничиваем лимитом)
+			this.prisma.throttleBucket.deleteMany({
+				where: { expiresAt: { lt: now } }
+			})
+		])
 	}
 
 	async refresh(refreshToken: string): Promise<AuthResponseDto> {
@@ -98,7 +120,13 @@ export class AuthService {
 				role: storedToken.user.role,
 				marketId: storedToken.user.marketId ?? undefined
 			}
-		)
+		).then(result => {
+			// Фоновая очистка истёкших токенов + ThrottleBucket после успешного рефреша
+			this.cleanupExpiredTokens(storedToken.user.id).catch(err =>
+				this.logger.warn(`Expired token cleanup failed for user ${storedToken.user.id}: ${err.message}`)
+			)
+			return result
+		})
 	}
 
 	async logout(refreshToken: string): Promise<void> {
