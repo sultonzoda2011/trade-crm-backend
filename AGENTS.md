@@ -25,7 +25,7 @@
 - Unit tests use **jest + ts-jest** (`jest.config.js`), no DB access — Prisma is mocked.
 - `jest.config.js`: `rootDir: 'src'`, `testRegex: '.*\.spec\.ts$'`, `clearMocks: true`, coverage output `../coverage`.
 - Specs live next to sources as `*.spec.ts`; `tsconfig.build.json` excludes them from the build.
-- 8 spec files cover: `auth.service` (login/refresh rotation/logout), `jwt.strategy` (caching), `transactions.service` (role/debtor/refund rules), `dashboard.service` (stats + revenue trend + payment distribution, mocked Prisma + `$queryRaw` assertions), `health.controller` (DB up/down), `markets.service` (**IDOR scoping**), `users.service` (last-admin protection), `throttler-storage.service` (rate-limit storage).
+- 8 spec files cover: `auth.service` (login rotation/logout), `jwt.strategy` (caching), `transactions.service` (role/debtor/refund rules), `dashboard.service` (stats + revenue trend + payment distribution, mocked Prisma + `$queryRaw` assertions), `health.controller` (DB up/down), `markets.service` (**IDOR scoping**), `users.service` (last-admin protection), `throttler-storage.service` (rate-limit storage).
 
 ## CI
 
@@ -45,7 +45,7 @@
 - DB config: `prisma.config.ts` (Prisma v7 config file format, not `prisma/schema.prisma` for datasource URLs).
 - Migrations: `prisma/migrations/`.
 - Run `prisma generate` after any schema change (`npm run prisma:generate`), otherwise `npx tsc` will fail against stale types.
-- Models: `User, RefreshToken, Market, Category, Product, Debtor, Transaction, TransactionItem, Payment, ThrottleBucket`.
+- Models: `User,  Market, Category, Product, Debtor, Transaction, TransactionItem, Payment, ThrottleBucket`.
 - `Transaction` has a self-relation for refunds: `refundOfId String? @unique` (relation `"TransactionRefund"`), plus composite indexes `@@index([marketId, type, createdAt])` and `@@index([createdById, type, createdAt])`.
 - `PrismaService.onModuleInit()` sweeps stale `ThrottleBucket` rows, wrapped in try/catch so a missing migration doesn't crash boot.
 - Enums are duplicated (Prisma schema + `src/enums/`) and are currently **in sync**: `Role`, `TransactionType`, `PaymentType`, `TransactionStatus`, `ProductUnit`. `DashboardPeriod` is DTO-only (`dashboard/dto/query-dashboard.dto.ts`, lowercase values) — intentionally not in Prisma.
@@ -116,7 +116,7 @@ Helpers in `src/common/utils/paginate.util.ts`:
 - Storage is `PrismaThrottlerStorage` backed by Postgres (`ThrottleBucket` table), so limits hold **across serverless instances**.
 - The storage does the whole hit/block calculation in one atomic `INSERT … ON CONFLICT DO UPDATE`; key format is `` `${throttlerName}:${key}` ``.
 - Depends on `app.set('trust proxy', 1)` in `bootstrap.ts` — without it every user shares one bucket.
-- Per-endpoint overrides today: login 5/60s, refresh 10/60s.
+- Per-endpoint overrides today: login 5/60s.
 
 ## JWT user cache
 
@@ -133,23 +133,21 @@ Helpers in `src/common/utils/paginate.util.ts`:
 | Cookie | httpOnly | maxAge | Purpose |
 |---|---|---|---|
 | `accessToken` | **yes** | 15 min | JWT — the only accepted credential |
-| `refreshToken` | **yes** | 30 days | rotation token |
 | `user` | **no** | 30 days | `encodeURIComponent(JSON.stringify(AuthUserDto))` — read by the frontend for client-side RBAC |
 
 Endpoints:
 
-- `POST /api/auth/login` — `@Public()`, throttled 5/60s, `@HttpCode(200)`. Sets all 3 cookies. Body returns `{ accessToken, user }` — **`refreshToken` is never in the response body**, the controller intercepts it into the cookie.
-- `POST /api/auth/refresh` — `@Public()`, throttled 10/60s, `@HttpCode(200)`. Reads the `refreshToken` **cookie** (throws `UnauthorizedException('Refresh token missing')` if absent), re-sets all 3 cookies, returns `{ accessToken, user }`.
+- `POST /api/auth/login` — `@Public()`, throttled 5/60s, `@HttpCode(200)`. Sets all 3 cookies. Body returns `{ accessToken, user }` — **`` is never in the response body**, the controller intercepts it into the cookie.
+
 - `POST /api/auth/logout` — **authenticated** (not `@Public()`), `@HttpCode(204)`. Clears all 3 cookies.
 
 Token internals (`auth.service.ts`):
 
 - `JwtPayload` has 7 fields: `sub`, `email`, `role`, `id`, `name`, `image?`, `marketId?`.
-- Refresh tokens are UUIDs stored as **SHA-256 hashes** in the DB, never in plaintext.
 - Rotation is **atomic** — `updateMany` guarded by `revokedAt: null`.
 - **Reuse detection**: presenting an already-revoked token revokes *all* of that user's tokens and logs a warning. A lost concurrent-rotation race (`count === 0`) is treated the same way.
 - `parseDuration` regex is `^(\d+)([smhd])$`, falling back to **7d** on unparseable input.
-- Login and refresh both fire-and-forget `cleanupExpiredTokens`, which prunes expired `refreshToken` rows *and* expired `ThrottleBucket` rows.
+- Login and  both fire-and-forget `cleanupExpiredTokens`, which prunes expired `` rows *and* expired `ThrottleBucket` rows.
 
 ## Transactions domain rules
 
@@ -187,10 +185,10 @@ Token internals (`auth.service.ts`):
 ## .env required vars
 
 ```
-DATABASE_URL, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+DATABASE_URL, JWT_ACCESS_SECRET,  CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
 ```
 
-Optional (validated in `src/config/env.validation.ts` with defaults): `NODE_ENV` (`development`), `JWT_ACCESS_EXPIRES_IN` (`15m`), `JWT_REFRESH_EXPIRES_IN` (`7d`), `BCRYPT_ROUNDS` (`12`), `PORT` (`3000`).
+Optional (validated in `src/config/env.validation.ts` with defaults): `NODE_ENV` (`development`), `JWT_ACCESS_EXPIRES_IN` (`15m`),  `BCRYPT_ROUNDS` (`12`), `PORT` (`3000`).
 
 Not validated — read via raw `process.env`: `DATABASE_POOL_MAX` (default `10`; на Vercel выставить `2`–`3` — каждый serverless-инстанс держит свой pg-пул).
 
