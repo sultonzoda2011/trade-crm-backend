@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../common/services/storage.service'
 import { PaginatedResult } from '../common/dto/pagination.dto'
@@ -103,7 +104,7 @@ export class MarketsService {
 		query: QueryMarketDto,
 		ownerMarketId?: string
 	): Promise<PaginatedResult<unknown>> {
-		const where: any = {}
+		const where: Prisma.MarketWhereInput = {}
 
 		// OWNER видит только свой маркет — это блокирует IDOR на чтение чужих данных.
 		if (ownerMarketId) where.id = ownerMarketId
