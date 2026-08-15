@@ -23,5 +23,5 @@ export class CategoryResponseDto {
   updatedAt: string
 
   @ApiPropertyOptional()
-  productsCount?: number
+  _count?: { products: number }
 }
