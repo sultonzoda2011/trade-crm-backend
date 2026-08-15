@@ -6,18 +6,18 @@ import {
 	UnauthorizedException
 } from '@nestjs/common'
 import { Prisma, TransactionStatus } from '@prisma/client'
-import { PrismaService } from '../prisma/prisma.service'
+import { PaginatedResult } from '../common/dto/pagination.dto'
+import {
+	buildDateWhere,
+	buildOrderBy,
+	paginate
+} from '../common/utils/paginate.util'
+import { DUE_SOON_DAYS, MS_PER_DAY, round2 } from '../common/utils/period.util'
 import { DebtStatusFilter, Role, TransactionType } from '../enums'
 import { JwtPayload } from '../interfaces'
-import { PaginatedResult } from '../common/dto/pagination.dto'
-import { buildDateWhere, buildOrderBy, paginate } from '../common/utils/paginate.util'
-import {
-	DUE_SOON_DAYS,
-	MS_PER_DAY,
-	round2
-} from '../common/utils/period.util'
-import { CreateTransactionDto } from './dto/create-transaction.dto'
+import { PrismaService } from '../prisma/prisma.service'
 import { CreatePaymentDto } from './dto/create-payment.dto'
+import { CreateTransactionDto } from './dto/create-transaction.dto'
 import { QueryTransactionDto } from './dto/query-transaction.dto'
 import { RefundTransactionDto } from './dto/refund-transaction.dto'
 import { UpdateTransactionDto } from './dto/update-transaction.dto'
@@ -28,12 +28,12 @@ const transactionInclude = {
 			product: { select: { id: true, name: true, price: true, image: true } }
 		}
 	},
-	createdBy: { select: { id: true, name: true, email: true , image: true } },
+	createdBy: { select: { id: true, name: true, email: true, image: true } },
 	debtor: { select: { id: true, name: true, phone: true } },
 	market: { select: { id: true, name: true, address: true, image: true } },
 	payments: {
 		include: {
-			createdBy: { select: { id: true, name: true, email: true , image: true } }
+			createdBy: { select: { id: true, name: true, email: true, image: true } }
 		},
 		orderBy: { createdAt: 'desc' }
 	}
@@ -94,9 +94,7 @@ export class TransactionsService {
 		// оформляет OWNER/ADMIN — иначе продавец может бесконтрольно
 		// списывать товар со склада без долговой обязанности.
 		if (user.role === Role.SELLER && dto.type !== TransactionType.DEBT) {
-			throw new ForbiddenException(
-				'Sellers can only create DEBT transactions'
-			)
+			throw new ForbiddenException('Sellers can only create DEBT transactions')
 		}
 
 		const isDebt = dto.type === TransactionType.DEBT
@@ -122,9 +120,7 @@ export class TransactionsService {
 					select: { marketId: true }
 				})
 				if (!debtor || debtor.marketId !== marketId) {
-					throw new BadRequestException(
-						'Debtor was not found in your market'
-					)
+					throw new BadRequestException('Debtor was not found in your market')
 				}
 			}
 			// Берём товары в рамках маркета пользователя, блокировкой строк через
@@ -186,7 +182,8 @@ export class TransactionsService {
 				data: {
 					marketId,
 					createdById: user.sub,
-					debtorId: dto.debtorId,
+					debtorId,
+					customerName: isDebt ? null : (dto.customerName ?? null),
 					type: dto.type,
 					paymentType: dto.paymentType,
 					totalAmount: itemsTotal,
@@ -212,13 +209,17 @@ export class TransactionsService {
 		if (query.createdById) where.createdById = query.createdById
 		if (query.type) where.type = query.type
 		if (query.status) where.status = query.status
-		if (query.dateFrom || query.dateTo) where.createdAt = buildDateWhere(query.dateFrom, query.dateTo)
+		if (query.dateFrom || query.dateTo)
+			where.createdAt = buildDateWhere(query.dateFrom, query.dateTo)
 		if (query.search) {
 			// Ищем и по должнику, и по имени создателя, чтобы SALE-транзакции
 			// (без должника) тоже попадали в результаты поиска.
 			where.OR = [
-				{ debtor:    { name: { contains: query.search, mode: 'insensitive' } } },
-				{ createdBy: { name: { contains: query.search, mode: 'insensitive' } } }
+				{ debtor: { name: { contains: query.search, mode: 'insensitive' } } },
+				{
+					createdBy: { name: { contains: query.search, mode: 'insensitive' } }
+				},
+				{ customerName: { contains: query.search, mode: 'insensitive' } }
 			]
 		}
 		if (query.paymentType) where.paymentType = query.paymentType
@@ -226,7 +227,9 @@ export class TransactionsService {
 			where.items = {
 				some: {
 					...(query.productId ? { productId: query.productId } : {}),
-					...(query.categoryId ? { product: { categoryId: query.categoryId } } : {})
+					...(query.categoryId
+						? { product: { categoryId: query.categoryId } }
+						: {})
 				}
 			}
 		}
@@ -460,7 +463,10 @@ export class TransactionsService {
 
 			// После отката пересчитываем статус исходной продажи: она снова
 			// PAID, если возвратов не осталось, либо PARTIALLY_REFUNDED.
-			if (transaction.type === TransactionType.REFUND && transaction.refundOfId) {
+			if (
+				transaction.type === TransactionType.REFUND &&
+				transaction.refundOfId
+			) {
 				const originalItems = await tx.transactionItem.findMany({
 					where: { transactionId: transaction.refundOfId },
 					select: { quantity: true, refundedQuantity: true }
@@ -582,8 +588,10 @@ export class TransactionsService {
 		if (original.type !== TransactionType.SALE) {
 			throw new BadRequestException('Only SALE transactions can be refunded')
 		}
-		if (original.status !== TransactionStatus.PAID &&
-			original.status !== TransactionStatus.PARTIALLY_REFUNDED) {
+		if (
+			original.status !== TransactionStatus.PAID &&
+			original.status !== TransactionStatus.PARTIALLY_REFUNDED
+		) {
 			throw new BadRequestException(
 				'Only fully paid SALE transactions can be refunded'
 			)
