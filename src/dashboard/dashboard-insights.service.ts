@@ -215,6 +215,29 @@ export class DashboardInsightsService {
 			})
 		}
 
+		// Товар-рекордсмен по числу транзакций за период. Абсолютное число
+		// может быть маленьким (например 2) — важно, что это максимум среди
+		// всех товаров: значит именно он лучше всего "уходит" прямо сейчас.
+		const withSales = products.filter(p => p.metrics.transactionCount > 0)
+		if (withSales.length > 0) {
+			const record = withSales.reduce((best, current) =>
+				current.metrics.transactionCount > best.metrics.transactionCount
+					? current
+					: best,
+			)
+			insights.push({
+				id: 'inventory.recordProduct',
+				severity: InsightSeverity.SUCCESS,
+				category: InsightCategory.INVENTORY,
+				messageKey: 'insights.inventory.recordProduct',
+				params: {
+					name: record.name,
+					count: record.metrics.transactionCount,
+				},
+				action: { route: '/products', query: { search: record.name } },
+			})
+		}
+
 		return insights
 	}
 
