@@ -117,6 +117,9 @@ model Transaction {
   remainingAmount Float             @default(0)
   discountAmount  Float             @default(0)
   dueDate         DateTime?
+  // Необязательный покупатель для SALE-транзакции («кому продали»).
+  // Для DEBT не используется: там покупатель — должник (debtorId).
+  customerName    String?
   // Одна SALE может иметь НЕСКОЛЬКО частичных возвратов, поэтому здесь нет
   // @unique. Ограничение «нельзя вернуть больше купленного» держится на
   // TransactionItem.refundedQuantity, а не на уникальности этой связи.

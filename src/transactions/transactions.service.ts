@@ -99,17 +99,24 @@ export class TransactionsService {
 			)
 		}
 
+		const isDebt = dto.type === TransactionType.DEBT
+
 		// DEBT без должника бессмыслен: не к кому будет предъявить долг.
-		if (dto.type === TransactionType.DEBT && !dto.debtorId) {
+		if (isDebt && !dto.debtorId) {
 			throw new BadRequestException('Debtor is required for DEBT transactions')
 		}
+
+		// Для SALE должник не используется: покупатель необязательный и хранится
+		// в customerName («кому продали»). Переданный для SALE debtorId молча
+		// игнорируется — долговая связка без долга бессмысленна.
+		const debtorId = isDebt ? dto.debtorId : null
 
 		const productIds = [...new Set(dto.items.map(i => i.productId))]
 
 		return this.prisma.$transaction(async tx => {
 			// Должник обязан принадлежать маркету пользователя — иначе можно
 			// привязать долг к чужому должнику (IDOR).
-			if (dto.debtorId) {
+			if (isDebt && dto.debtorId) {
 				const debtor = await tx.debtor.findUnique({
 					where: { id: dto.debtorId },
 					select: { marketId: true }
@@ -158,8 +165,6 @@ export class TransactionsService {
 					totalPrice: lineTotal
 				}
 			})
-
-			const isDebt = dto.type === TransactionType.DEBT
 
 			// Проверяем остаток и списываем сток атомарно: decrement только если
 			// quantity >= списываемого количества, иначе запись не обновится и мы

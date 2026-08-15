@@ -7,7 +7,9 @@ import {
   IsInt,
   IsNumber,
   IsOptional,
+  IsString,
   IsUUID,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator'
@@ -35,10 +37,16 @@ class CreateTransactionItemDto {
 }
 
 export class CreateTransactionDto {
-  @ApiPropertyOptional({ example: 'debtor-uuid' })
+  @ApiPropertyOptional({ example: 'debtor-uuid', description: 'Debtor ID. Only used for DEBT transactions; ignored for SALE.' })
   @IsOptional()
   @IsUUID()
   debtorId?: string
+
+  @ApiPropertyOptional({ example: 'Иван', description: 'Optional customer name for a SALE ("who it was sold to"). Not used for DEBT.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  customerName?: string
 
   @ApiProperty({ enum: TransactionType, example: TransactionType.SALE })
   @IsEnum(TransactionType)
