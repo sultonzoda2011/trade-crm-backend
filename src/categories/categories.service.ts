@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import { Express } from 'express'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../common/services/storage.service'
@@ -23,7 +24,7 @@ export class CategoriesService {
   }
 
   async findAll(query: QueryCategoryDto, marketId?: string) {
-    const where: any = {}
+    const where: Prisma.CategoryWhereInput = {}
 
     if (marketId) where.marketId = marketId
     if (query.search) where.name = { contains: query.search, mode: 'insensitive' }
