@@ -203,6 +203,109 @@ prisma.$transaction.mockImplementation((cb: any) =>
 			})
 			expect(tx.product.updateMany).toHaveBeenCalledTimes(2)
 		})
+
+		it('ignores debtorId on a SALE and stores no debtor', async () => {
+			const tx = {
+				debtor: { findUnique: jest.fn().mockResolvedValue({ marketId }) },
+				product: {
+					findMany: jest.fn().mockResolvedValue([
+						{
+							id: 'p1',
+							name: 'Milk',
+							price: 100,
+							quantity: 10,
+							categoryId: null
+						}
+					]),
+					updateMany: jest.fn().mockResolvedValue({ count: 1 })
+				},
+				transaction: { create: jest.fn().mockResolvedValue({ id: 'tx1' }) }
+			}
+			prisma.$transaction.mockImplementation((cb: any) => cb(tx))
+
+			await service.create(
+				{
+					type: TransactionType.SALE,
+					debtorId: 'debtor-1',
+					items: [{ productId: 'p1', quantity: 1 }],
+					paymentType: 'CASH'
+				} as any,
+				ownerUser
+			)
+
+			const data = tx.transaction.create.mock.calls[0][0].data
+			expect(data.debtorId).toBeNull()
+			expect(tx.debtor.findUnique).not.toHaveBeenCalled()
+		})
+
+		it('persists customerName on a SALE', async () => {
+			const tx = {
+				debtor: { findUnique: jest.fn() },
+				product: {
+					findMany: jest.fn().mockResolvedValue([
+						{
+							id: 'p1',
+							name: 'Milk',
+							price: 100,
+							quantity: 10,
+							categoryId: null
+						}
+					]),
+					updateMany: jest.fn().mockResolvedValue({ count: 1 })
+				},
+				transaction: { create: jest.fn().mockResolvedValue({ id: 'tx1' }) }
+			}
+			prisma.$transaction.mockImplementation((cb: any) => cb(tx))
+
+			await service.create(
+				{
+					type: TransactionType.SALE,
+					customerName: 'Иван',
+					items: [{ productId: 'p1', quantity: 1 }],
+					paymentType: 'CASH'
+				} as any,
+				ownerUser
+			)
+
+			const data = tx.transaction.create.mock.calls[0][0].data
+			expect(data.customerName).toBe('Иван')
+			expect(data.debtorId).toBeNull()
+		})
+
+		it('does not persist customerName on a DEBT', async () => {
+			const tx = {
+				debtor: { findUnique: jest.fn().mockResolvedValue({ marketId }) },
+				product: {
+					findMany: jest.fn().mockResolvedValue([
+						{
+							id: 'p1',
+							name: 'Milk',
+							price: 100,
+							quantity: 10,
+							categoryId: null
+						}
+					]),
+					updateMany: jest.fn().mockResolvedValue({ count: 1 })
+				},
+				transaction: { create: jest.fn().mockResolvedValue({ id: 'tx1' }) }
+			}
+			prisma.$transaction.mockImplementation((cb: any) => cb(tx))
+
+			await service.create(
+				{
+					type: TransactionType.DEBT,
+					debtorId: 'debtor-1',
+					customerName: 'Иван',
+					items: [{ productId: 'p1', quantity: 1 }],
+					paymentType: 'CREDIT'
+				} as any,
+				ownerUser
+			)
+
+			const data = tx.transaction.create.mock.calls[0][0].data
+			expect(data.customerName).toBeNull()
+			expect(data.debtorId).toBe('debtor-1')
+		})
 	})
 
 	describe('update', () => {
