@@ -28,7 +28,7 @@ npm run start:dev
 | Framework | NestJS v11 (Express) |
 | Database | PostgreSQL |
 | ORM | Prisma v7 |
-| Auth | JWT + refresh tokens (bcrypt, passport) |
+| Auth | JWT +  tokens (bcrypt, passport) |
 | Validation | class-validator + class-transformer |
 | API Docs | Swagger / OpenAPI |
 | File Storage | Cloudinary |
@@ -36,7 +36,7 @@ npm run start:dev
 
 ## Features
 
-- JWT authentication with refresh token rotation and logout
+- JWT authentication with  token rotation and logout
 - Role-based access control: `ADMIN`, `OWNER`, `SELLER`
 - CRUD for users, markets, products, debtors, and transactions
 - Debt tracking with partial payment recording
@@ -74,7 +74,7 @@ Patterns: modular design, repository pattern via PrismaService, global JWT guard
 
 ## Database Schema
 
-**Models:** User, RefreshToken, Market, Product, Debtor, Transaction, TransactionItem, Payment
+**Models:** User, , Market, Product, Debtor, Transaction, TransactionItem, Payment
 
 - Market belongs to an owner (User)
 - Products, Debtors, Transactions are scoped to a Market
@@ -91,9 +91,7 @@ All endpoints are prefixed with `/api`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/auth/login` | Public | Login (returns access + refresh tokens) |
-| POST | `/auth/refresh` | Public | Refresh access token |
-| POST | `/auth/logout` | Bearer | Revoke refresh token |
+| POST | `/auth/logout` | Bearer | Revoke  token |
 
 ### Users (admin only)
 
@@ -155,9 +153,7 @@ Create a `.env` file:
 ```env
 DATABASE_URL="postgresql://user:password@host:5432/db"
 JWT_ACCESS_SECRET="your-access-secret"
-JWT_REFRESH_SECRET="your-refresh-secret"
 JWT_ACCESS_EXPIRES_IN="15m"
-JWT_REFRESH_EXPIRES_IN="30d"
 CLOUDINARY_CLOUD_NAME="your-cloud-name"
 CLOUDINARY_API_KEY="your-api-key"
 CLOUDINARY_API_SECRET="your-api-secret"
@@ -203,10 +199,9 @@ Swagger docs: `http://localhost:4000/api/docs`
 
 ## Auth Flow
 
-1. `POST /auth/login` with email/password → returns `{ accessToken, refreshToken, user }`
+1. `POST /auth/login` with email/password → returns `{ accessToken,  user }`
 2. Send `Authorization: Bearer <accessToken>` for protected endpoints
-3. When the access token expires, `POST /auth/refresh` with the refresh token body → new token pair
-4. `POST /auth/logout` revokes the refresh token
+3. `POST /auth/logout` revokes the  token
 
 ## Project Status
 
