@@ -29,6 +29,10 @@ class EnvironmentVariables {
 
   @IsNumber()
   @IsOptional()
+  BCRYPT_ROUNDS: number = 12
+
+  @IsNumber()
+  @IsOptional()
   PORT: number = 3000
 
   @IsString()
