@@ -9,3 +9,4 @@ uploads/
 .vercel/
 .vercel
 PNG (transparent background)/
+*.log
