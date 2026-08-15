@@ -1,8 +1,8 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common'
-import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger'
+import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Roles } from '../auth/decorators/roles.decorator'
-import { Role } from '../enums'
+import { DebtorRisk, Role } from '../enums'
 import { JwtPayload } from '../interfaces'
 import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe'
 import { ApiErrorResponse } from '../common/decorators/api-error-response.decorator'
@@ -28,7 +28,22 @@ export class DebtorsController {
 
   @Get()
   @ApiOkResponse({ type: DebtorResponseDto })
+  @ApiOperation({
+    summary: 'List debtors with collection priority',
+    description:
+      'Every debtor is returned with an aggregated debt profile: outstanding amount, overdue amount, days overdue, repayment history and a deterministic repayment risk with the factors that produced it.',
+  })
   @ApiQuery({ name: 'search', required: false, description: 'Search by name or phone' })
+  @ApiQuery({ name: 'hasActiveDebts', required: false, type: Boolean })
+  @ApiQuery({ name: 'overdue', required: false, type: Boolean })
+  @ApiQuery({ name: 'minDebtAmount', required: false, type: Number })
+  @ApiQuery({ name: 'maxDebtAmount', required: false, type: Number })
+  @ApiQuery({ name: 'risk', required: false, enum: DebtorRisk, description: 'Filter by computed repayment risk' })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    description: 'Column to sort by. Accepts computed fields: totalDebtAmount, overdueAmount, maxDaysOverdue, risk',
+  })
   @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiQuery({ name: 'limit', required: false, example: 20 })
   findAll(@Query() query: QueryDebtorDto, @CurrentUser() user: JwtPayload): Promise<PaginatedResult<unknown>> {
