@@ -38,7 +38,12 @@ export function configureApp(app: NestExpressApplication): void {
 	app.enableCors({
 		origin:
 			nodeEnv === 'production'
-				? ['https://trade-crm-frontend.vercel.app', 'capacitor://localhost']
+				? [
+						'https://trade-crm-frontend.vercel.app',
+						'capacitor://localhost',
+						'https://localhost',
+						'http://localhost'
+					]
 				: ['http://localhost:5173', 'http://localhost:3000'],
 		credentials: true,
 		methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
