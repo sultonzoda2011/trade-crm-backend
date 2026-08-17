@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config'
 import { NestExpressApplication } from '@nestjs/platform-express'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import compression from 'compression'
-import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
 
 const logger = new Logger('Bootstrap')
@@ -21,8 +20,6 @@ export function configureApp(app: NestExpressApplication): void {
 	// не работает и все пользователи делят один лимит. 1 = доверяем первому
 	// hop'у X-Forwarded-For.
 	app.set('trust proxy', 1)
-	// Нужен для чтения httpOnly cookie с accessToken в AuthController.
-	app.use(cookieParser())
 
 	// Базовые security-заголовки. CSP отключён: API отдаёт только JSON, а
 	// Swagger UI в dev использует инлайн-скрипты и CDN, что с CSP несовместимо.
@@ -39,13 +36,14 @@ export function configureApp(app: NestExpressApplication): void {
 		origin:
 			nodeEnv === 'production'
 				? [
-						'https://trade-crm-frontend.vercel.app',
+						'https://crm-trade.vercel.app',
 						'capacitor://localhost',
 						'https://localhost',
 						'http://localhost'
 					]
 				: ['http://localhost:5173', 'http://localhost:3000'],
-		credentials: true,
+		// Токен идёт в заголовке Authorization, а не в cookie — credentials:true
+		// (отправка cookie кросс-доменно) больше не требуется.
 		methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
 		allowedHeaders: ['Content-Type', 'Authorization']
 	})
