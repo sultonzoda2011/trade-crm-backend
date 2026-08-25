@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config'
 import {
+	BadRequestException,
 	ConflictException,
 	Injectable,
 	NotFoundException,
@@ -12,9 +13,13 @@ import { PaginatedResult } from '../common/dto/pagination.dto'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../common/services/storage.service'
 import { buildDateWhere, buildOrderBy, paginate } from '../common/utils/paginate.util'
+import { round2 } from '../common/utils/period.util'
+import { JwtPayload } from '../interfaces'
 import { CreateSellerDto } from './dto/create-seller.dto'
 import { QuerySellerDto } from './dto/query-seller.dto'
 import { UpdateSellerDto } from './dto/update-seller.dto'
+import { CreateSellerCreditDto } from './dto/create-seller-credit.dto'
+import { QuerySellerCreditDto } from './dto/query-seller-credit.dto'
 
 const sellerSelect = {
 	id: true,
@@ -145,5 +150,108 @@ export class SellersService {
 		}
 
 		await this.prisma.user.delete({ where: { id } })
+	}
+
+	/**
+	 * Баланс продавца по надбавкам (markup): сколько он накопил сверх цены
+	 * по своим SALE/DEBT-транзакциям, минус markup, откатившийся возвратами
+	 * тех же строк, минус то, что ему уже выдано (SellerCredit).
+	 * Считается двумя отдельными запросами (earned/refunded), а не одним
+	 * агрегатом — потому что "refunded" ищется по цепочке
+	 * refundOfItem -> исходная транзакция -> createdById, а не напрямую
+	 * по продавцу REFUND-транзакции (возврат обычно оформляет OWNER/ADMIN).
+	 */
+	async getBalance(id: string, marketId?: string): Promise<{
+		sellerId: string
+		earned: number
+		refunded: number
+		paidOut: number
+		balance: number
+	}> {
+		await this.findOne(id, marketId)
+
+		const earnedItems = await this.prisma.transactionItem.findMany({
+			where: {
+				markup: { gt: 0 },
+				transaction: { createdById: id, type: { in: ['SALE', 'DEBT'] } }
+			},
+			select: { markup: true }
+		})
+		const earned = earnedItems.reduce((sum, i) => sum + i.markup, 0)
+
+		const refundedItems = await this.prisma.transactionItem.findMany({
+			where: {
+				markup: { gt: 0 },
+				transaction: { type: 'REFUND' },
+				refundOfItem: { transaction: { createdById: id } }
+			},
+			select: { markup: true }
+		})
+		const refunded = refundedItems.reduce((sum, i) => sum + i.markup, 0)
+
+		const creditsAgg = await this.prisma.sellerCredit.aggregate({
+			where: { sellerId: id },
+			_sum: { amount: true }
+		})
+		const paidOut = creditsAgg._sum.amount ?? 0
+
+		return {
+			sellerId: id,
+			earned: round2(earned),
+			refunded: round2(refunded),
+			paidOut: round2(paidOut),
+			balance: round2(earned - refunded - paidOut)
+		}
+	}
+
+	/**
+	 * Выдать продавцу часть или весь накопленный баланс. Доступно только
+	 * OWNER/ADMIN (контроллер ограничивает роли). Сумма не может превышать
+	 * текущий баланс — иначе можно было бы "уйти в минус".
+	 */
+	async createCredit(id: string, dto: CreateSellerCreditDto, user: JwtPayload, marketId?: string) {
+		await this.findOne(id, marketId)
+
+		const { balance } = await this.getBalance(id, marketId)
+		if (dto.amount > balance) {
+			throw new BadRequestException(
+				`Payout amount (${dto.amount}) exceeds seller's current balance (${balance})`
+			)
+		}
+
+		return this.prisma.sellerCredit.create({
+			data: {
+				sellerId: id,
+				amount: dto.amount,
+				note: dto.note,
+				createdById: user.sub
+			},
+			include: { createdBy: { select: { id: true, name: true } } }
+		})
+	}
+
+	async listCredits(
+		id: string,
+		query: QuerySellerCreditDto,
+		marketId?: string
+	): Promise<PaginatedResult<unknown>> {
+		await this.findOne(id, marketId)
+
+		const where: Prisma.SellerCreditWhereInput = { sellerId: id }
+		if (query.dateFrom || query.dateTo) where.createdAt = buildDateWhere(query.dateFrom, query.dateTo)
+
+		return paginate(query, ({ skip, take }) =>
+			this.prisma.sellerCredit.findMany({
+				where,
+				include: { createdBy: { select: { id: true, name: true } } },
+				orderBy: buildOrderBy(query.sortBy, query.sortOrder, 'createdAt', [
+					'createdAt',
+					'amount'
+				]),
+				skip,
+				take
+			}),
+			() => this.prisma.sellerCredit.count({ where })
+		)
 	}
 }
