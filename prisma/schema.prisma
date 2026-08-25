@@ -20,6 +20,8 @@ model User {
   payments      Payment[]
   transactions  Transaction[]
   market        Market?        @relation(fields: [marketId], references: [id])
+  creditsReceived SellerCredit[] @relation("SellerCredits")
+  creditsGiven    SellerCredit[] @relation("CreditsGivenBy")
 
   @@index([marketId])
 }
@@ -104,6 +106,10 @@ model Transaction {
   updatedAt       DateTime          @updatedAt
   remainingAmount Float             @default(0)
   discountAmount  Float             @default(0)
+  // Сумма надбавок (markup) по всем позициям — сколько сверху цены накинули
+  // за эту транзакцию. Хранится агрегатом здесь же, чтобы не пересчитывать
+  // сумму по items на каждый список/отчёт.
+  markupAmount    Float             @default(0)
   dueDate         DateTime?
   // Необязательный покупатель для SALE-транзакции («кому продали»).
   // Для DEBT не используется: там покупатель — должник (debtorId).
@@ -137,6 +143,11 @@ model TransactionItem {
   price         Float
   totalPrice    Float
   discount      Float       @default(0)
+  // Надбавка сверху цены за эту позицию — противоположность discount.
+  // Может добавить любая роль при создании транзакции, но накопление и
+  // выплата (SellerCredit) считается только для строк, где создатель
+  // транзакции — SELLER.
+  markup        Float       @default(0)
   // Сколько единиц этой строки уже возвращено. Растёт при каждом частичном
   // возврате и служит единственным источником правды для проверки
   // «нельзя вернуть больше купленного». На строках REFUND-транзакций всегда 0.
@@ -166,6 +177,22 @@ model Payment {
 
   @@index([transactionId])
   @@index([createdById])
+}
+
+// Учёт выдачи накопленных надбавок (markup) продавцу. Баланс продавца —
+// это Σ TransactionItem.markup по его транзакциям минус Σ SellerCredit.amount.
+// Выдавать можно частями (amount может быть меньше текущего баланса).
+model SellerCredit {
+  id          String   @id @default(uuid())
+  sellerId    String
+  amount      Float
+  note        String?
+  createdById String
+  createdAt   DateTime @default(now())
+  seller      User     @relation("SellerCredits", fields: [sellerId], references: [id])
+  createdBy   User     @relation("CreditsGivenBy", fields: [createdById], references: [id])
+
+  @@index([sellerId])
 }
 
 // Персистентное хранилище rate limiting (PrismaThrottlerStorage).
