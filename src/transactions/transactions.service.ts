@@ -145,7 +145,8 @@ export class TransactionsService {
 			const itemsData = dto.items.map(item => {
 				const product = productMap.get(item.productId)!
 				const discount = item.discount ?? 0
-				const lineTotal = item.quantity * product.price - discount
+				const markup = item.markup ?? 0
+				const lineTotal = item.quantity * product.price - discount + markup
 				if (lineTotal < 0) {
 					throw new BadRequestException(
 						`Discount exceeds line total for product "${product.name}"`
@@ -158,6 +159,7 @@ export class TransactionsService {
 					quantity: item.quantity,
 					price: product.price,
 					discount,
+					markup,
 					totalPrice: lineTotal
 				}
 			})
@@ -188,6 +190,7 @@ export class TransactionsService {
 					paymentType: dto.paymentType,
 					totalAmount: itemsTotal,
 					discountAmount: itemsData.reduce((s, i) => s + i.discount, 0),
+					markupAmount: itemsData.reduce((s, i) => s + i.markup, 0),
 					remainingAmount: isDebt ? itemsTotal : 0,
 					status: isDebt ? TransactionStatus.ACTIVE : TransactionStatus.PAID,
 					dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
@@ -632,9 +635,11 @@ export class TransactionsService {
 			throw new BadRequestException('Transaction was already refunded')
 		}
 
-		// Сумма возврата считается по цене и скидке ИСХОДНОЙ строки,
+		// Сумма возврата считается по цене, скидке и надбавке ИСХОДНОЙ строки,
 		// пропорционально возвращаемому количеству — иначе частичный возврат
-		// по товару со скидкой вернул бы покупателю больше, чем он заплатил.
+		// по товару со скидкой/надбавкой вернул бы покупателю больше или меньше,
+		// чем он заплатил. Надбавка тоже "откатывается" — продавец не должен
+		// сохранять markup за возвращённый товар в своём балансе.
 		const refundItems = requested.map(({ item, quantity }) => {
 			const unitNet = item.totalPrice / item.quantity
 			return {
@@ -644,6 +649,7 @@ export class TransactionsService {
 				productName: item.productName,
 				price: item.price,
 				discount: round2((item.discount / item.quantity) * quantity),
+				markup: round2((item.markup / item.quantity) * quantity),
 				totalPrice: round2(unitNet * quantity)
 			}
 		})
@@ -688,6 +694,9 @@ export class TransactionsService {
 					discountAmount: round2(
 						refundItems.reduce((sum, line) => sum + line.discount, 0)
 					),
+					markupAmount: round2(
+						refundItems.reduce((sum, line) => sum + line.markup, 0)
+					),
 					remainingAmount: 0,
 					status: TransactionStatus.PAID,
 					items: {
@@ -697,6 +706,7 @@ export class TransactionsService {
 							quantity: line.quantity,
 							price: line.price,
 							discount: line.discount,
+							markup: line.markup,
 							totalPrice: line.totalPrice,
 							refundOfItemId: line.item.id
 						}))
