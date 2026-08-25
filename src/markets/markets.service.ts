@@ -1,23 +1,22 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
-import { PrismaService } from '../prisma/prisma.service'
-import { StorageService } from '../common/services/storage.service'
 import { PaginatedResult } from '../common/dto/pagination.dto'
+import { StorageService } from '../common/services/storage.service'
 import {
 	buildDateWhere,
 	buildOrderBy,
 	paginate
 } from '../common/utils/paginate.util'
+import { PrismaService } from '../prisma/prisma.service'
 import { CreateMarketDto } from './dto/create-market.dto'
 import { QueryMarketDto } from './dto/query-market.dto'
 import { UpdateMarketDto } from './dto/update-market.dto'
-import { Express } from 'express'
 
 const marketInclude = {
 	users: {
 		select: { id: true, name: true, image: true, email: true, role: true }
 	},
-	_count: { select: { products: true, debtors: true, transactions: true } }
+	_count: { select: { debtors: true, transactions: true, products: true } }
 } as const
 
 const ownerSelect = {
