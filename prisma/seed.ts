@@ -8,6 +8,7 @@ const prisma = new PrismaClient({
 })
 
 async function clearTables() {
+	await prisma.sellerCredit.deleteMany()
 	await prisma.payment.deleteMany()
 	await prisma.transactionItem.deleteMany()
 	await prisma.transaction.deleteMany()
@@ -614,6 +615,7 @@ interface TxnItem {
 	quantity: number
 	price: number
 	discount: number
+	markup: number
 	totalPrice: number
 }
 
@@ -630,7 +632,8 @@ interface TxnDef {
 function line(
 	product: { id: string; name: string; price: number },
 	quantity: number,
-	discount = 0
+	discount = 0,
+	markup = 0
 ): TxnItem {
 	return {
 		productId: product.id,
@@ -638,7 +641,8 @@ function line(
 		quantity,
 		price: product.price,
 		discount,
-		totalPrice: product.price * quantity - discount
+		markup,
+		totalPrice: product.price * quantity - discount + markup
 	}
 }
 
@@ -660,13 +664,24 @@ function buildTxnDefs(
 	const payers: ('CASH' | 'CARD')[] = ['CASH', 'CARD']
 	let cursor = 0
 
-	// Обычные продажи — основной поток, разного размера чека.
+	// Обычные продажи — основной поток, разного размера чека. Часть строк
+	// содержит markup (продавец накинул сверху цены), часть — discount,
+	// часть вообще без изменений цены, чтобы данные выглядели естественно.
 	for (let i = 0; i < 24; i++) {
 		const seller = i % 3 === 0 ? owner : sellers[i % sellers.length]
 		const itemCount = 1 + (i % 3)
 		const items: TxnItem[] = []
 		for (let k = 0; k < itemCount; k++) {
-			items.push(line(p(cursor + k), 1 + ((i + k) % 4), i % 5 === 0 ? 1000 : 0))
+			const hasDiscount = (i + k) % 5 === 0
+			const hasMarkup = !hasDiscount && (i + k) % 4 === 0
+			items.push(
+				line(
+					p(cursor + k),
+					1 + ((i + k) % 4),
+					hasDiscount ? 1000 : 0,
+					hasMarkup ? 500 + ((i + k) % 5) * 500 : 0
+				)
+			)
 		}
 		cursor += itemCount
 		defs.push({
@@ -674,7 +689,9 @@ function buildTxnDefs(
 			paymentType: payers[i % payers.length],
 			status: 'PAID',
 			createdById: seller.id,
-			daysAgo: i * 2, // раз в два дня — 24 продажи покрывают ~48 дней
+			// Раз в ~2 дня, но со сдвигом по часам, чтобы транзакции одного дня
+			// не сваливались в одну точку времени (график по часам не пустой).
+			daysAgo: i * 2 + (i % 6) / 6,
 			items
 		})
 	}
@@ -682,7 +699,10 @@ function buildTxnDefs(
 	// Долги: часть ещё не тронута (ACTIVE), часть частично погашена (PARTIAL).
 	debtors.forEach((debtor, i) => {
 		const seller = sellers[i % sellers.length]
-		const items = [line(p(cursor), 2 + i, 0), line(p(cursor + 1), 1, 0)]
+		const items = [
+			line(p(cursor), 2 + i, 0, i % 2 === 0 ? 1000 : 0),
+			line(p(cursor + 1), 1, 0)
+		]
 		cursor += 2
 		defs.push({
 			type: 'DEBT',
@@ -690,7 +710,7 @@ function buildTxnDefs(
 			status: i % 2 === 0 ? 'ACTIVE' : 'PARTIAL',
 			createdById: seller.id,
 			debtorId: debtor.id,
-			daysAgo: 3 + i * 4,
+			daysAgo: 3 + i * 4 + (i % 3) / 4,
 			items
 		})
 	})
@@ -724,6 +744,7 @@ async function createTransactions(
 			quantity: number
 			price: number
 			discount: number
+			markup: number
 			totalPrice: number
 		}[]
 	}[] = []
@@ -740,6 +761,7 @@ async function createTransactions(
 				paymentType: def.paymentType,
 				totalAmount: totalFromItems,
 				discountAmount: def.items.reduce((s, i) => s + i.discount, 0),
+				markupAmount: def.items.reduce((s, i) => s + i.markup, 0),
 				remainingAmount:
 					def.status === 'ACTIVE'
 						? totalFromItems
@@ -783,6 +805,47 @@ async function createPayments(
 }
 
 /**
+ * Баланс продавца = Σ markup по его транзакциям (SALE/DEBT, не REFUND).
+ * Для сида выдаём каждому продавцу примерно половину накопленного —
+ * так на странице продавца сразу видно и остаток к выдаче, и историю
+ * уже выданных сумм, а не пустой баланс или полностью закрытый.
+ */
+async function createSellerCredits(
+	transactions: {
+		createdById: string
+		type: string
+		items: { markup: number }[]
+		createdAt: Date
+	}[],
+	sellers: { id: string }[],
+	owner: { id: string }
+) {
+	for (const seller of sellers) {
+		const earned = transactions
+			.filter(t => t.createdById === seller.id && t.type !== 'REFUND')
+			.reduce(
+				(sum, t) => sum + t.items.reduce((s, i) => s + i.markup, 0),
+				0
+			)
+		if (earned <= 0) continue
+
+		const payoutAmount = Math.round(earned * 0.5)
+		if (payoutAmount <= 0) continue
+
+		await prisma.sellerCredit.create({
+			data: {
+				sellerId: seller.id,
+				amount: payoutAmount,
+				note: 'Частичная выплата накопленной надбавки',
+				createdById: owner.id,
+				// выдано неделю назад — остаток продолжает копиться после этой даты
+				createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+			}
+		})
+	}
+}
+
+/**
  * Пара честных возвратов поверх уже созданных PAID-продаж — без них
  * страница возврата и аналитика (refundedRevenue, PARTIALLY_REFUNDED)
  * в дашборде всегда были бы пустыми. Логика зеркалит
@@ -805,6 +868,7 @@ async function createRefunds(
 			quantity: number
 			price: number
 			discount: number
+			markup: number
 			totalPrice: number
 		}[]
 	}[],
@@ -837,6 +901,7 @@ async function createRefunds(
 			paymentType: full.paymentType as 'CASH' | 'CARD' | 'CREDIT',
 			totalAmount: full.items.reduce((s, i) => s + i.totalPrice, 0),
 			discountAmount: full.items.reduce((s, i) => s + i.discount, 0),
+			markupAmount: full.items.reduce((s, i) => s + i.markup, 0),
 			remainingAmount: 0,
 			status: 'PAID',
 			items: {
@@ -846,6 +911,7 @@ async function createRefunds(
 					quantity: i.quantity,
 					price: i.price,
 					discount: i.discount,
+					markup: i.markup,
 					totalPrice: i.totalPrice,
 					refundOfItemId: i.id
 				}))
@@ -870,6 +936,7 @@ async function createRefunds(
 		discount: Math.round(
 			(partialItem.discount / partialItem.quantity) * refundQty
 		),
+		markup: Math.round((partialItem.markup / partialItem.quantity) * refundQty),
 		totalPrice: Math.round(unitNet * refundQty)
 	}
 	await prisma.transactionItem.update({
@@ -890,6 +957,7 @@ async function createRefunds(
 			paymentType: partial.paymentType as 'CASH' | 'CARD' | 'CREDIT',
 			totalAmount: refundLine.totalPrice,
 			discountAmount: refundLine.discount,
+			markupAmount: refundLine.markup,
 			remainingAmount: 0,
 			status: 'PAID',
 			items: { create: [{ ...refundLine, refundOfItemId: partialItem.id }] }
@@ -960,6 +1028,11 @@ async function main() {
 	await createPayments(transactions1, m1.sellers)
 	await createPayments(transactions2, m2.sellers)
 	console.log('  ✓ Платежи созданы')
+
+	console.log('Начисление и частичная выплата надбавок продавцам...')
+	await createSellerCredits(transactions1, m1.sellers, m1.owner)
+	await createSellerCredits(transactions2, m2.sellers, m2.owner)
+	console.log('  ✓ Надбавки выданы (частично)')
 
 	console.log('Создание возвратов (полный + частичный на рынок)...')
 	await createRefunds(m1.market.id, transactions1, m1.owner)
