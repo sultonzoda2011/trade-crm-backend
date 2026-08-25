@@ -34,6 +34,10 @@ import { CreateSellerDto } from './dto/create-seller.dto'
 import { UpdateSellerDto } from './dto/update-seller.dto'
 import { QuerySellerDto } from './dto/query-seller.dto'
 import { SellerResponseDto } from './dto/seller-response.dto'
+import { CreateSellerCreditDto } from './dto/create-seller-credit.dto'
+import { QuerySellerCreditDto } from './dto/query-seller-credit.dto'
+import { SellerBalanceResponseDto } from './dto/seller-balance-response.dto'
+import { SellerCreditResponseDto } from './dto/seller-credit-response.dto'
 import { PaginatedResult } from '../common/dto/pagination.dto'
 import { Express } from 'express'
 
@@ -139,5 +143,51 @@ export class SellersController {
 		@CurrentUser('marketId') marketId?: string
 	) {
 		return this.sellersService.remove(id, marketId)
+	}
+
+	@Get(':id/balance')
+	@ApiOperation({
+		summary: "Get a seller's markup balance",
+		description:
+			'Returns how much markup the seller has earned, how much was reversed by refunds, how much was already paid out, and the current balance available to pay out.'
+	})
+	@ApiParam({ name: 'id', type: String, format: 'uuid' })
+	@ApiOkResponse({ type: SellerBalanceResponseDto })
+	getBalance(
+		@Param('id', ParseUUIDPipe) id: string,
+		@CurrentUser('marketId') marketId?: string
+	) {
+		return this.sellersService.getBalance(id, marketId)
+	}
+
+	@Post(':id/credits')
+	@ApiOperation({
+		summary: 'Pay out part or all of the seller\'s markup balance',
+		description:
+			"Records a payout to the seller. Amount cannot exceed the seller's current balance. Payouts can be made in parts."
+	})
+	@ApiParam({ name: 'id', type: String, format: 'uuid' })
+	@ApiCreatedResponse({ type: SellerCreditResponseDto })
+	createCredit(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() dto: CreateSellerCreditDto,
+		@CurrentUser() user: JwtPayload,
+		@CurrentUser('marketId') marketId?: string
+	) {
+		return this.sellersService.createCredit(id, dto, user, marketId)
+	}
+
+	@Get(':id/credits')
+	@ApiOperation({ summary: "Get a seller's payout history" })
+	@ApiParam({ name: 'id', type: String, format: 'uuid' })
+	@ApiOkResponse({ type: SellerCreditResponseDto })
+	@ApiQuery({ name: 'page', required: false, example: 1 })
+	@ApiQuery({ name: 'limit', required: false, example: 20 })
+	listCredits(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Query() query: QuerySellerCreditDto,
+		@CurrentUser('marketId') marketId?: string
+	): Promise<PaginatedResult<unknown>> {
+		return this.sellersService.listCredits(id, query, marketId)
 	}
 }
