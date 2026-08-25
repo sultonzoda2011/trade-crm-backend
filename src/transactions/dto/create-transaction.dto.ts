@@ -34,6 +34,15 @@ class CreateTransactionItemDto {
   @IsNumber()
   @Min(0)
   discount?: number
+
+  @ApiPropertyOptional({
+    example: 0,
+    description: 'Markup for this line item — the opposite of discount, added on top of the product price. Can be set by any role. Only accumulates toward a payout balance when the transaction creator is a SELLER.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  markup?: number
 }
 
 export class CreateTransactionDto {
