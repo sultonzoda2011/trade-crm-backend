@@ -19,6 +19,7 @@ import { TransactionsModule } from './transactions/transactions.module'
 import { UsersModule } from './users/users.module'
 import { validate } from './config/env.validation'
 import { PrismaThrottlerStorage } from './common/services/throttler-storage.service'
+import { SyncModule } from './sync/sync.module'
 
 @Module({
 	imports: [
@@ -51,6 +52,7 @@ import { PrismaThrottlerStorage } from './common/services/throttler-storage.serv
 		DebtorsModule,
 		TransactionsModule,
 		DashboardModule,
+		SyncModule,
 		HealthModule
 	],
 	providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }]
