@@ -59,7 +59,7 @@ export class SyncService {
 		// изменить запись, она просто попадёт в следующий пул, а не потеряется.
 		const serverTime = new Date()
 
-		const [products, categories, debtors, transactions] = await Promise.all([
+		const [products, categories, debtors, transactions, market, users] = await Promise.all([
 			this.prisma.product.findMany({
 				where: { marketId, updatedAt: { gt: sinceDate } }
 			}),
@@ -73,6 +73,17 @@ export class SyncService {
 				where: { marketId, updatedAt: { gt: sinceDate } },
 				include: transactionInclude,
 				orderBy: { createdAt: 'asc' }
+			}),
+			// Свой маркет — не список всех маркетов (SELLER/OWNER их и не видят
+			// online), просто карточка своего маркета для офлайн-профиля/шапки.
+			this.prisma.market.findFirst({
+				where: { id: marketId, updatedAt: { gt: sinceDate } }
+			}),
+			// Продавцы/сотрудники этого маркета — нужны офлайн для выбора
+			// "кто продавец" в форме транзакции (markup) и списка на странице sellers.
+			this.prisma.user.findMany({
+				where: { marketId, updatedAt: { gt: sinceDate } },
+				select: { id: true, name: true, email: true, role: true, marketId: true, image: true, createdAt: true, updatedAt: true }
 			})
 		])
 
@@ -81,7 +92,9 @@ export class SyncService {
 			products,
 			categories,
 			debtors,
-			transactions
+			transactions,
+			market,
+			users
 		}
 	}
 }
