@@ -240,3 +240,18 @@ enum ProductUnit {
   M
   BOX
 }
+
+// Защита от дублей при повторной отправке мутации (офлайн-клиент ретраит
+// запрос после обрыва связи, не зная, успел ли предыдущий дойти до сервера).
+// Ключ передаётся клиентом в заголовке Idempotency-Key.
+model IdempotencyKey {
+  id         String   @id @default(uuid())
+  key        String   @unique
+  userId     String
+  endpoint   String
+  statusCode Int
+  response   Json
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}

@@ -1,11 +1,12 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common'
-import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger'
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseInterceptors } from '@nestjs/common'
+import { ApiBearerAuth, ApiCreatedResponse, ApiHeader, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger'
 import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { Role } from '../enums'
 import { JwtPayload } from '../interfaces'
 import { ApiErrorResponse } from '../common/decorators/api-error-response.decorator'
+import { IdempotencyInterceptor } from '../common/interceptors/idempotency.interceptor'
 import { TransactionsService } from './transactions.service'
 import { CreateTransactionDto } from './dto/create-transaction.dto'
 import { CreatePaymentDto } from './dto/create-payment.dto'
@@ -26,6 +27,8 @@ export class TransactionsController {
   // "SELLER может создавать только DEBT" выполняется в сервисе — это блокирует
   // бесконтрольное списание товара со склада продавцом без долговой обязанности.
   @Post()
+  @UseInterceptors(IdempotencyInterceptor)
+  @ApiHeader({ name: 'Idempotency-Key', required: false, description: 'Client-generated uuid to dedupe retried offline mutations' })
   @ApiCreatedResponse({ type: TransactionResponseDto })
   create(@Body() dto: CreateTransactionDto, @CurrentUser() user: JwtPayload) {
     return this.transactionsService.create(dto, user)
@@ -83,6 +86,8 @@ export class TransactionsController {
   }
 
   @Patch(':id/pay')
+  @UseInterceptors(IdempotencyInterceptor)
+  @ApiHeader({ name: 'Idempotency-Key', required: false, description: 'Client-generated uuid to dedupe retried offline mutations' })
   @ApiOkResponse({ type: TransactionResponseDto, description: 'Payment recorded' })
   pay(
     @Param('id', ParseUUIDPipe) id: string,
@@ -96,6 +101,8 @@ export class TransactionsController {
   // Пустое тело сохраняет прежнее поведение — возврат всего остатка целиком.
   @Post(':id/refund')
   @Roles(Role.ADMIN, Role.OWNER)
+  @UseInterceptors(IdempotencyInterceptor)
+  @ApiHeader({ name: 'Idempotency-Key', required: false, description: 'Client-generated uuid to dedupe retried offline mutations' })
   @ApiOkResponse({ type: TransactionResponseDto, description: 'Refund created, stock restored' })
   refund(
     @Param('id', ParseUUIDPipe) id: string,
