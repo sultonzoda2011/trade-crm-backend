@@ -45,7 +45,13 @@ export function configureApp(app: NestExpressApplication): void {
 		// Токен идёт в заголовке Authorization, а не в cookie — credentials:true
 		// (отправка cookie кросс-доменно) больше не требуется.
 		methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-		allowedHeaders: ['Content-Type', 'Authorization']
+		// Cache-Control/Pragma добавлены фронтендом на КАЖДЫЙ GET (см.
+		// app/lib/client.ts) — без них Android WebView/OkHttp может тихо
+		// отдать закэшированный ответ вместо реального похода на сервер, и
+		// JS не в состоянии это отличить. Без явного allowedHeaders браузер
+		// (и WebView, если он не использует нативный CapacitorHttp-мост)
+		// заблокирует такой запрос ещё на CORS preflight.
+		allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma']
 	})
 
 	app.useGlobalPipes(
