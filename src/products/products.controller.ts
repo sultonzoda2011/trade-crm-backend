@@ -22,12 +22,13 @@ import { Express } from 'express'
 @ApiTags('Products')
 @ApiBearerAuth()
 @ApiErrorResponse()
-@Roles(Role.ADMIN, Role.OWNER)
+@Roles(Role.ADMIN, Role.OWNER, Role.SELLER)
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Post()
+  @Roles(Role.ADMIN, Role.OWNER)
   @ApiOperation({ summary: 'Create a product', description: 'Creates a new product with an optional image in the current user\'s market.' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -84,6 +85,7 @@ export class ProductsController {
   }
 
   @Patch(':id')
+  @Roles(Role.ADMIN, Role.OWNER)
   @ApiOperation({ summary: 'Update a product', description: 'Updates a product with partial data and an optional new image.' })
   @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Product ID' })
   @ApiConsumes('multipart/form-data')
@@ -112,6 +114,7 @@ export class ProductsController {
   }
 
   @Delete(':id')
+  @Roles(Role.ADMIN, Role.OWNER)
   @ApiOperation({ summary: 'Delete a product', description: 'Deletes a product and its associated image.' })
   @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Product ID' })
   @ApiOkResponse({ description: 'Product successfully deleted' })

@@ -12,6 +12,8 @@ import { FileInterceptor } from '@nestjs/platform-express'
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 import { Express } from 'express'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import { Roles } from '../auth/decorators/roles.decorator'
+import { Role } from '../enums'
 import { ApiErrorResponse } from '../common/decorators/api-error-response.decorator'
 import { multerOptions } from '../common/utils/multipart.util'
 import { JwtPayload } from '../interfaces'
@@ -21,20 +23,20 @@ import { UpdateProfileDto } from './dto/update-profile.dto'
 import { ProfileService } from './profile.service'
 
 @ApiTags('Profile')
+@ApiBearerAuth()
 @ApiErrorResponse()
+@Roles(Role.ADMIN, Role.OWNER, Role.SELLER)
 @Controller('profile')
 export class ProfileController {
 	constructor(private readonly profileService: ProfileService) {}
 
 	@Get()
-	@ApiBearerAuth()
 	@ApiOkResponse({ type: ProfileResponseDto })
 	getProfile(@CurrentUser() user: JwtPayload) {
 		return this.profileService.getProfile(user.sub)
 	}
 
 	@Patch()
-	@ApiBearerAuth()
 	@ApiConsumes('multipart/form-data')
 	@ApiBody({
 		schema: {
@@ -58,7 +60,6 @@ export class ProfileController {
 
 	@Patch('password')
 	@HttpCode(HttpStatus.OK)
-	@ApiBearerAuth()
 	@ApiOkResponse({ description: 'Password updated' })
 	changePassword(@Body() dto: ChangePasswordDto, @CurrentUser() user: JwtPayload) {
 		return this.profileService.changePassword(user.sub, dto)

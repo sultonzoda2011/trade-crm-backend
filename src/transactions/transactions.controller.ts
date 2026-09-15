@@ -19,6 +19,7 @@ import { PaginatedResult } from '../common/dto/pagination.dto'
 @ApiTags('Transactions')
 @ApiBearerAuth()
 @ApiErrorResponse()
+@Roles(Role.ADMIN, Role.OWNER, Role.SELLER)
 @Controller('transactions')
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
@@ -29,6 +30,7 @@ export class TransactionsController {
   @Post()
   @UseInterceptors(IdempotencyInterceptor)
   @ApiHeader({ name: 'Idempotency-Key', required: false, description: 'Client-generated uuid to dedupe retried offline mutations' })
+  // Все роли могут создавать транзакции, но SELLER ограничивается только DEBT (проверка в сервисе)
   @ApiCreatedResponse({ type: TransactionResponseDto })
   create(@Body() dto: CreateTransactionDto, @CurrentUser() user: JwtPayload) {
     return this.transactionsService.create(dto, user)

@@ -64,6 +64,7 @@ export class MarketsController {
   }
 
   @Get(':id')
+  @Roles(Role.ADMIN, Role.OWNER, Role.SELLER)
   @ApiOperation({ summary: 'Get a market by ID', description: 'Returns a single market with full details.' })
   @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Market ID' })
   @ApiOkResponse({ type: MarketResponseDto, description: 'The found market' })

@@ -17,12 +17,12 @@ import { Express } from 'express'
 @ApiTags('Users')
 @ApiBearerAuth()
 @ApiErrorResponse()
+@Roles(Role.ADMIN)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  @Roles(Role.ADMIN)
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -44,7 +44,6 @@ export class UsersController {
   }
 
   @Get()
-  @Roles(Role.ADMIN)
   @ApiOkResponse({ type: UserResponseDto })
   @ApiQuery({ name: 'search', required: false, description: 'Search by name or email' })
   @ApiQuery({ name: 'role', required: false, enum: ['ADMIN', 'OWNER', 'SELLER'] })
@@ -55,14 +54,12 @@ export class UsersController {
   }
 
   @Get(':id')
-  @Roles(Role.ADMIN)
   @ApiOkResponse({ type: UserResponseDto })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.findOne(id)
   }
 
   @Patch(':id')
-  @Roles(Role.ADMIN)
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -83,7 +80,6 @@ export class UsersController {
   }
 
   @Delete(':id')
-  @Roles(Role.ADMIN)
   @ApiOkResponse({ description: 'User deleted' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.remove(id)

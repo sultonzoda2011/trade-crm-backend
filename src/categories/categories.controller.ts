@@ -18,7 +18,7 @@ import { Express } from 'express'
 @ApiTags('Categories')
 @ApiBearerAuth()
 @ApiErrorResponse()
-@Roles(Role.ADMIN, Role.OWNER)
+@Roles(Role.ADMIN, Role.OWNER,Role.SELLER)
 @Controller('categories')
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
