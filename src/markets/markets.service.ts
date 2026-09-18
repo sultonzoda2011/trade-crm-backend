@@ -11,6 +11,17 @@ import { PrismaService } from '../prisma/prisma.service'
 import { CreateMarketDto } from './dto/create-market.dto'
 import { QueryMarketDto } from './dto/query-market.dto'
 import { UpdateMarketDto } from './dto/update-market.dto'
+import { ProductsService } from '../products/products.service'
+import { DebtorsService } from '../debtors/debtors.service'
+import { TransactionsService } from '../transactions/transactions.service'
+import { QueryProductDto } from '../products/dto/query-product.dto'
+import { QueryDebtorDto } from '../debtors/dto/query-debtor.dto'
+import { QueryTransactionDto } from '../transactions/dto/query-transaction.dto'
+import { JwtPayload } from '../interfaces'
+import { Role } from '../enums'
+
+/** Превью товаров/должников/транзакций на детальной странице маркета. */
+const MARKET_PREVIEW_LIMIT = 5
 
 const marketInclude = {
 	users: {
@@ -31,7 +42,10 @@ const ownerSelect = {
 export class MarketsService {
 	constructor(
 		private readonly prisma: PrismaService,
-		private readonly storageService: StorageService
+		private readonly storageService: StorageService,
+		private readonly productsService: ProductsService,
+		private readonly debtorsService: DebtorsService,
+		private readonly transactionsService: TransactionsService
 	) {}
 
 	private async getScopedMarket(id: string, ownerMarketId?: string) {
@@ -154,6 +168,36 @@ export class MarketsService {
 			throw new NotFoundException('Market not found')
 		}
 		return this.enrichMarket(market)
+	}
+
+	/**
+	 * Карточка маркета + превью товаров/должников/транзакций — одним запросом.
+	 *
+	 * Превью раньше (и здесь тоже) грузятся ТОЛЬКО для своего маркета
+	 * (marketId сотрудника === маркет, который он смотрит) — для чужого
+	 * маркета (например ADMIN листает список) их не считаем зря, точно
+	 * так же, как фронт раньше не отправлял эти запросы.
+	 */
+	async findOneFull(id: string, requestingUser: JwtPayload) {
+		const ownerScopeId = requestingUser.role === Role.OWNER ? requestingUser.marketId : undefined
+		const market = await this.findOne(id, ownerScopeId)
+
+		const isOwnMarket = Boolean(requestingUser.marketId) && requestingUser.marketId === id
+		const previewQuery = { page: 1, limit: MARKET_PREVIEW_LIMIT }
+
+		const [products, debtors, transactions] = await Promise.all([
+			isOwnMarket
+				? this.productsService.findAll(previewQuery as QueryProductDto, requestingUser.marketId)
+				: Promise.resolve(null),
+			isOwnMarket
+				? this.debtorsService.findAll(previewQuery as QueryDebtorDto, requestingUser.marketId)
+				: Promise.resolve(null),
+			isOwnMarket
+				? this.transactionsService.findAll(previewQuery as QueryTransactionDto, requestingUser.marketId)
+				: Promise.resolve(null)
+		])
+
+		return { market, products, debtors, transactions }
 	}
 
 	async update(

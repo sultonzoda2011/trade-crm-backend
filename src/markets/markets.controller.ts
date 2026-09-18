@@ -72,6 +72,18 @@ export class MarketsController {
     return this.marketsService.findOne(id, user.role === Role.OWNER ? user.marketId : undefined)
   }
 
+  @Get(':id/full')
+  @Roles(Role.ADMIN, Role.OWNER, Role.SELLER)
+  @ApiOperation({
+    summary: 'Market detail page in one round-trip',
+    description: 'Market + products/debtors/transactions previews (own market only) — 4 queries in parallel server-side instead of 4 client round-trips.'
+  })
+  @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Market ID' })
+  findOneFull(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+    return this.marketsService.findOneFull(id, user)
+  }
+
+
   @Patch(':id')
   @Roles(Role.ADMIN, Role.OWNER)
   @ApiOperation({ summary: 'Update a market', description: 'Updates a market with partial data and an optional new image. Admin or the owner of the market.' })
