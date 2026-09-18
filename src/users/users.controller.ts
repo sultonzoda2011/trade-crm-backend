@@ -59,6 +59,12 @@ export class UsersController {
     return this.usersService.findOne(id)
   }
 
+  @Get(':id/full')
+  @ApiOkResponse({ description: 'User detail page in one round-trip: user + owned markets (if any) + recent transactions preview' })
+  findOneFull(@Param('id', ParseUUIDPipe) id: string) {
+    return this.usersService.findOneFull(id)
+  }
+
   @Patch(':id')
   @ApiConsumes('multipart/form-data')
   @ApiBody({

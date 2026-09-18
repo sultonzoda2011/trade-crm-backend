@@ -15,13 +15,22 @@ import { buildDateWhere, buildOrderBy, paginate } from '../common/utils/paginate
 import { CreateUserDto } from './dto/create-user.dto'
 import { QueryUserDto } from './dto/query-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
+import { MarketsService } from '../markets/markets.service'
+import { QueryMarketDto } from '../markets/dto/query-market.dto'
+import { TransactionsService } from '../transactions/transactions.service'
+import { QueryTransactionDto } from '../transactions/dto/query-transaction.dto'
+
+/** Превью транзакций пользователя на детальной странице. */
+const USER_TRANSACTIONS_PREVIEW_LIMIT = 5
 
 @Injectable()
 export class UsersService {
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly storageService: StorageService,
-		private readonly configService: ConfigService
+		private readonly configService: ConfigService,
+		private readonly marketsService: MarketsService,
+		private readonly transactionsService: TransactionsService
 	) {}
 
 	private userSelect = {
@@ -98,6 +107,32 @@ export class UsersService {
 		})
 		if (!user) throw new NotFoundException('User not found')
 		return user
+	}
+
+	/**
+	 * Карточка пользователя + (для ADMIN/OWNER) маркеты в его владении +
+	 * превью созданных им транзакций — одним запросом вместо трёх.
+	 *
+	 * Раньше запрос маркетов на фронте был УСЛОВНЫМ (enabled: isAdminOrOwner) —
+	 * настоящая клиентская зависимость "дождись роли из первого ответа,
+	 * потом реши, нужен ли второй запрос". Здесь то же решение принимается
+	 * сразу после первого запроса, но на сервере.
+	 */
+	async findOneFull(id: string) {
+		const user = await this.findOne(id)
+		const isAdminOrOwner = user.role === Role.ADMIN || user.role === Role.OWNER
+
+		const [markets, transactions] = await Promise.all([
+			isAdminOrOwner
+				? this.marketsService.findAll({ ownerId: id, page: 1, limit: 100 } as QueryMarketDto, undefined)
+				: Promise.resolve(null),
+			this.transactionsService.findAll(
+				{ createdById: id, page: 1, limit: USER_TRANSACTIONS_PREVIEW_LIMIT } as QueryTransactionDto,
+				undefined
+			)
+		])
+
+		return { user, markets, transactions }
 	}
 
 	async update(id: string, dto: UpdateUserDto, file?: Express.Multer.File) {
