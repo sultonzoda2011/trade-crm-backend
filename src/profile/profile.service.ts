@@ -10,6 +10,14 @@ import { StorageService } from '../common/services/storage.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { ChangePasswordDto } from './dto/change-password.dto'
 import { UpdateProfileDto } from './dto/update-profile.dto'
+import { MarketsService } from '../markets/markets.service'
+import { TransactionsService } from '../transactions/transactions.service'
+import { QueryTransactionDto } from '../transactions/dto/query-transaction.dto'
+import { JwtPayload } from '../interfaces'
+import { Role } from '../enums'
+
+/** Превью транзакций на странице профиля. */
+const PROFILE_TRANSACTIONS_PREVIEW_LIMIT = 5
 
 const PROFILE_SELECT = {
 	id: true,
@@ -25,7 +33,9 @@ const PROFILE_SELECT = {
 export class ProfileService {
 	constructor(
 		private readonly prisma: PrismaService,
-		private readonly storageService: StorageService
+		private readonly storageService: StorageService,
+		private readonly marketsService: MarketsService,
+		private readonly transactionsService: TransactionsService
 	) {}
 
 	async getProfile(userId: string) {
@@ -35,6 +45,28 @@ export class ProfileService {
 		})
 		if (!user) throw new NotFoundException('User not found')
 		return user
+	}
+
+	/**
+	 * Профиль + маркет + превью транзакций — одним запросом.
+	 *
+	 * Товары/должники на этой странице намеренно НЕ включены: на фронте они
+	 * грузятся только при реальном открытии соответствующей вкладки
+	 * (`activeTab === 'products'/'debtors'`) — это уже правильно сделанная
+	 * ленивая загрузка, тащить их сюда заранее было бы шагом назад.
+	 */
+	async getFullProfile(user: JwtPayload) {
+		const [profile, market, transactions] = await Promise.all([
+			this.getProfile(user.sub),
+			user.marketId
+				? this.marketsService.findOne(user.marketId, user.role === Role.OWNER ? user.marketId : undefined)
+				: Promise.resolve(null),
+			this.transactionsService.findAll(
+				{ page: 1, limit: PROFILE_TRANSACTIONS_PREVIEW_LIMIT } as QueryTransactionDto,
+				user.marketId
+			)
+		])
+		return { profile, market, transactions }
 	}
 
 	async updateProfile(

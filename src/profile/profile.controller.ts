@@ -36,6 +36,12 @@ export class ProfileController {
 		return this.profileService.getProfile(user.sub)
 	}
 
+	@Get('full')
+	@ApiOkResponse({ description: 'Profile page in one round-trip: profile + own market + recent transactions preview' })
+	getFullProfile(@CurrentUser() user: JwtPayload) {
+		return this.profileService.getFullProfile(user)
+	}
+
 	@Patch()
 	@ApiConsumes('multipart/form-data')
 	@ApiBody({
