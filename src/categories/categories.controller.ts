@@ -65,6 +65,12 @@ export class CategoriesController {
     return this.categoriesService.findOne(id, marketId)
   }
 
+  @Get(':id/full')
+  @ApiOkResponse({ description: 'Category detail page in one round-trip: category + its market + products preview' })
+  findOneFull(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+    return this.categoriesService.findOneFull(id, user)
+  }
+
   @Patch(':id')
   @ApiConsumes('multipart/form-data')
   @ApiBody({

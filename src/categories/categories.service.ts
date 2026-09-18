@@ -7,12 +7,22 @@ import { buildDateWhere, buildOrderBy, paginate } from '../common/utils/paginate
 import { CreateCategoryDto } from './dto/create-category.dto'
 import { UpdateCategoryDto } from './dto/update-category.dto'
 import { QueryCategoryDto } from './dto/query-category.dto'
+import { MarketsService } from '../markets/markets.service'
+import { ProductsService } from '../products/products.service'
+import { QueryProductDto } from '../products/dto/query-product.dto'
+import { Role } from '../enums'
+import { JwtPayload } from '../interfaces'
+
+/** Превью товаров категории на детальной странице — дальше "Все". */
+const CATEGORY_PRODUCTS_PREVIEW_LIMIT = 5
 
 @Injectable()
 export class CategoriesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
+    private readonly marketsService: MarketsService,
+    private readonly productsService: ProductsService,
   ) {}
 
   async create(dto: CreateCategoryDto, file?: Express.Multer.File, marketId?: string) {
@@ -57,6 +67,33 @@ export class CategoriesService {
     if (!category) throw new NotFoundException('Category not found')
     if (marketId && category.marketId !== marketId) throw new NotFoundException('Category not found')
     return category
+  }
+
+  /**
+   * Карточка категории + её маркет + превью товаров — одним запросом.
+   *
+   * На фронте это раньше было НАСТОЯЩИМ waterfall (не просто параллельные
+   * запросы): маркет грузился вторым запросом, который ждал marketId из
+   * ответа на первый. Здесь та же зависимость есть, но она внутри одного
+   * запроса к бэку — один медленный клиентский round-trip вместо двух.
+   */
+  async findOneFull(id: string, requestingUser: JwtPayload) {
+    const category = await this.findOne(id, requestingUser.marketId)
+
+    const [market, products] = await Promise.all([
+      // Та же логика видимости маркета, что и в MarketsController.findOne:
+      // OWNER видит только свой маркет, ADMIN/SELLER — без ограничения.
+      this.marketsService.findOne(
+        category.marketId,
+        requestingUser.role === Role.OWNER ? requestingUser.marketId : undefined
+      ),
+      this.productsService.findAll(
+        { categoryId: id, page: 1, limit: CATEGORY_PRODUCTS_PREVIEW_LIMIT } as QueryProductDto,
+        requestingUser.marketId
+      )
+    ])
+
+    return { category, market, products }
   }
 
   async update(id: string, dto: UpdateCategoryDto, file?: Express.Multer.File, marketId?: string) {
