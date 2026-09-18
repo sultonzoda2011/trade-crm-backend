@@ -40,6 +40,25 @@ const transactionInclude = {
 } as const
 
 /**
+ * Облегчённый include для пагинированного списка транзакций.
+ *
+ * Список рендерит только превью товаров и должника — payments/createdBy/полный
+ * market ему не нужны (не отображаются ни в таблице, ни в мобильной карточке),
+ * но раньше тянулись на каждую из 20 строк каждой страницы. History платежей
+ * и подробности market/createdBy остаются в transactionDetailInclude — они
+ * нужны только на карточке одной транзакции.
+ */
+const transactionListInclude = {
+	items: {
+		include: {
+			product: { select: { id: true, name: true, price: true, image: true } }
+		}
+	},
+	debtor: { select: { id: true, name: true, phone: true } },
+	market: { select: { id: true, name: true } }
+} as const
+
+/**
  * Детальный include: дополнительно тянет связанные возвраты и исходную продажу,
  * чтобы страница транзакции показывала весь бизнес-процесс
  * (Sale → Payment → Refund) без второго round-trip.
@@ -248,7 +267,7 @@ export class TransactionsService {
 			({ skip, take }) =>
 				this.prisma.transaction.findMany({
 					where,
-					include: transactionInclude,
+					include: transactionListInclude,
 					orderBy: buildOrderBy(query.sortBy, query.sortOrder, 'createdAt', [
 						'createdAt',
 						'totalAmount',
