@@ -56,6 +56,12 @@ export class DebtorsController {
     return this.debtorsService.findOne(id, user.marketId)
   }
 
+  @Get(':id/full')
+  @ApiOperation({ summary: 'Debtor detail page in one round-trip: debtor + recent transactions preview' })
+  findOneFull(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+    return this.debtorsService.findOneFull(id, user.marketId)
+  }
+
   @Patch(':id')
   @ApiOkResponse({ type: DebtorResponseDto })
   update(

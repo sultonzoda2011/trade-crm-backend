@@ -8,6 +8,11 @@ import { CreateDebtorDto } from './dto/create-debtor.dto'
 import { QueryDebtorDto } from './dto/query-debtor.dto'
 import { UpdateDebtorDto } from './dto/update-debtor.dto'
 import { DebtorRisk, TransactionStatus } from '../enums'
+import { TransactionsService } from '../transactions/transactions.service'
+import { QueryTransactionDto } from '../transactions/dto/query-transaction.dto'
+
+/** Превью транзакций должника на детальной странице — дальше кнопка "Все". */
+const DEBTOR_TRANSACTIONS_PREVIEW_LIMIT = 5
 
 const ACTIVE_DEBT_STATUSES: TransactionStatus[] = [TransactionStatus.ACTIVE, TransactionStatus.PARTIAL]
 
@@ -249,7 +254,10 @@ function buildRiskComparator(sortBy: string | undefined, sortOrder: 'asc' | 'des
 
 @Injectable()
 export class DebtorsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly transactionsService: TransactionsService
+  ) {}
 
   /**
    * Долговой профиль по списку должников — один запрос на всю страницу,
@@ -532,6 +540,22 @@ export class DebtorsService {
 
     const profiles = await this.getDebtProfiles([id], new Date())
     return { ...debtor, ...(profiles.get(id) ?? EMPTY_PROFILE) }
+  }
+
+  /**
+   * Карточка должника + превью его транзакций одним запросом вместо двух
+   * отдельных round-trip'ов с фронта (раньше это были параллельные, но всё
+   * равно два разных HTTP-запроса на мобильном интернете магазина).
+   */
+  async findOneFull(id: string, userMarketId?: string) {
+    const [debtor, transactions] = await Promise.all([
+      this.findOne(id, userMarketId),
+      this.transactionsService.findAll(
+        { debtorId: id, page: 1, limit: DEBTOR_TRANSACTIONS_PREVIEW_LIMIT } as QueryTransactionDto,
+        userMarketId
+      )
+    ])
+    return { debtor, transactions }
   }
 
   /** Проверка существования и принадлежности маркету без расчёта профиля. */
