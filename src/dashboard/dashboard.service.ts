@@ -160,6 +160,7 @@ export class DashboardService {
 			leaders,
 			returnedProducts,
 			categories,
+			previousCategories,
 			trendRows,
 			paymentMix,
 			inventory
@@ -170,15 +171,14 @@ export class DashboardService {
 			this.metrics.getProductLeaders(period.current, scope),
 			this.metrics.getTopReturnedProducts(period.current, scope),
 			this.metrics.getCategoryRevenue(period.current, scope),
+			// Раньше считалось отдельным await ПОСЛЕ этого Promise.all — лишняя
+			// последовательная стадия при том же объёме работы БД, ничем не
+			// оправданная (все метрики независимы друг от друга).
+			this.metrics.getCategoryRevenue(period.previous, scope),
 			this.metrics.getRevenueTrend(period.current, scope, period.truncUnit),
 			this.metrics.getPaymentMix(period.current, scope),
 			this.getInventorySnapshot(period, marketId)
 		])
-
-		const previousCategories = await this.metrics.getCategoryRevenue(
-			period.previous,
-			scope
-		)
 
 		const salesComparison = buildComparison(
 			salesCurrent.netRevenue,
