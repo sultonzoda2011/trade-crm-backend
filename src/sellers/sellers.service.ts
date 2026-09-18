@@ -20,6 +20,11 @@ import { QuerySellerDto } from './dto/query-seller.dto'
 import { UpdateSellerDto } from './dto/update-seller.dto'
 import { CreateSellerCreditDto } from './dto/create-seller-credit.dto'
 import { QuerySellerCreditDto } from './dto/query-seller-credit.dto'
+import { TransactionsService } from '../transactions/transactions.service'
+import { QueryTransactionDto } from '../transactions/dto/query-transaction.dto'
+
+/** Превью транзакций/выплат на детальной странице продавца — дальше "Все". */
+const SELLER_PREVIEW_LIMIT = 5
 
 const sellerSelect = {
 	id: true,
@@ -38,7 +43,8 @@ export class SellersService {
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly storageService: StorageService,
-		private readonly configService: ConfigService
+		private readonly configService: ConfigService,
+		private readonly transactionsService: TransactionsService
 	) {}
 
 	async create(dto: CreateSellerDto, file?: Express.Multer.File, marketId?: string) {
@@ -109,6 +115,24 @@ export class SellersService {
 		})
 		if (!seller) throw new NotFoundException('Seller not found')
 		return seller
+	}
+
+	/**
+	 * Карточка продавца целиком: сам продавец, превью его транзакций, баланс
+	 * по надбавкам и превью выплат — раньше это были 4 отдельных запроса с
+	 * фронта, теперь один round-trip, 4 запроса к БД параллельно внутри.
+	 */
+	async findOneFull(id: string, marketId?: string) {
+		const [seller, transactions, balance, credits] = await Promise.all([
+			this.findOne(id, marketId),
+			this.transactionsService.findAll(
+				{ createdById: id, page: 1, limit: SELLER_PREVIEW_LIMIT } as QueryTransactionDto,
+				marketId
+			),
+			this.getBalance(id, marketId),
+			this.listCredits(id, { page: 1, limit: SELLER_PREVIEW_LIMIT } as QuerySellerCreditDto, marketId)
+		])
+		return { seller, transactions, balance, credits }
 	}
 
 	async update(id: string, dto: UpdateSellerDto, file?: Express.Multer.File, marketId?: string) {

@@ -108,6 +108,19 @@ export class SellersController {
 		return this.sellersService.findOne(id, marketId)
 	}
 
+	@Get(':id/full')
+	@ApiOperation({
+		summary: 'Seller detail page in one round-trip',
+		description: 'Seller + recent transactions preview + markup balance + recent payouts preview — 4 queries in parallel server-side instead of 4 client round-trips.'
+	})
+	@ApiParam({ name: 'id', type: String, format: 'uuid' })
+	findOneFull(
+		@Param('id', ParseUUIDPipe) id: string,
+		@CurrentUser('marketId') marketId?: string
+	) {
+		return this.sellersService.findOneFull(id, marketId)
+	}
+
 	@Patch(':id')
 	@ApiOperation({ summary: 'Update a seller' })
 	@ApiParam({ name: 'id', type: String, format: 'uuid' })
