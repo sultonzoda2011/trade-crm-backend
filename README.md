@@ -2,96 +2,125 @@
 
 **v0.1.0** — RESTful CRM API for managing markets and bazaars. Built with NestJS, Prisma, and PostgreSQL.
 
-## ⚠️ После обновления схемы (audit fixes, июль 2026)
-
-Схема Prisma была изменена (новые поля/модели: `Category`, `ProductUnit`, `REFUND`/`REFUNDED`,
-`dueDate`, `discount`, cascade-delete, индексы). Перед первым запуском обязательно:
+## Quick Start
 
 ```bash
-npm install
-npx prisma generate
-npx prisma migrate dev --name audit-fixes
-npm run prisma:seed   # опционально, тестовые данные
-npm run start:dev
+npm install                        # postinstall runs `prisma generate` automatically
+cp .env.example .env               # fill in DATABASE_URL, JWT_ACCESS_SECRET, Cloudinary keys
+npx prisma migrate dev             # apply schema / create migrations
+npm run prisma:seed                # optional: test data
+npm run start:dev                  # http://localhost:4000/api
 ```
 
-Примечание: `prisma generate` (v7) пишет клиент в `node_modules/@prisma/client` — это
-единственный актуальный источник типов. Папка `prisma/generated/` — устаревший артефакт
-старого конфига, не используется и не обновляется: не импортируйте из неё (`@prisma/client`).
+Swagger docs: `http://localhost:4000/api/docs`
+
+Default seed credentials: `admin@tradecrm.com` / `12345678Aa`
+
+> **Note on Prisma v7:** `prisma generate` writes the client to `node_modules/@prisma/client` —
+> this is the only current source of types. Do not import from `prisma/generated/`
+> (stale artifact of an old config; it is no longer updated).
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Runtime | Node.js |
-| Language | TypeScript |
-| Framework | NestJS v11 (Express) |
-| Database | PostgreSQL |
+| Runtime | Node.js 18+ |
+| Language | TypeScript (strict) |
+| Framework | NestJS v11 (Express 5) |
+| Database | PostgreSQL (pg driver pool, `DATABASE_POOL_MAX`) |
 | ORM | Prisma v7 |
-| Auth | JWT +  tokens (bcrypt, passport) |
+| Auth | JWT access token (bcrypt, passport) |
 | Validation | class-validator + class-transformer |
+| Security | helmet, @nestjs/throttler, idempotency keys |
 | API Docs | Swagger / OpenAPI |
 | File Storage | Cloudinary |
+| Tests | jest + ts-jest (mocked Prisma, no DB) |
+| CI | GitHub Actions (typecheck → tests → migrate deploy → audit) |
 | Deploy | Vercel (serverless, Node 20) |
 
 ## Features
 
-- JWT authentication with  token rotation and logout
-- Role-based access control: `ADMIN`, `OWNER`, `SELLER`
-- CRUD for users, markets, products, debtors, and transactions
-- Debt tracking with partial payment recording
+- JWT authentication (`POST /auth/login` returns access token + user in body; cookies are no longer used)
+- Role-based access control: `ADMIN`, `OWNER`, `SELLER`; global JWT guard with `@Public()` bypass
+- CRUD for users, markets, categories, products, sellers, debtors, and transactions
+- Debt tracking with partial payment recording and refunds (`ACTIVE / PARTIAL / PAID / REFUNDED / PARTIALLY_REFUNDED`)
+- Seller balances and credit operations (`SellerCredit`)
 - Image upload for markets and products (JPEG, PNG, WebP, GIF; max 5MB) via Cloudinary
-- Dashboard: KPI stats, revenue trend (`day`/`month` buckets), payment-type distribution, sellers report
+- Dashboard: KPI stats, overview, revenue trend (`day`/`month` buckets), payment-type distribution, sellers report
 - Search, filtering, and pagination across all entities
-- Automatic data scoping per user's market
-- Standardized JSON responses (`success`, `data`, `timestamp`)
-- Swagger API documentation
+- Automatic data scoping per user's market (IDOR protection)
+- Idempotent transaction creation via `IdempotencyKey`
+- Rate limiting (throttler with DB-backed `ThrottleBucket`), login throttled to 5/min
+- Standardized JSON responses (`success`, `data`, `timestamp`) via global interceptor
+- Health check endpoint (`GET /health`)
 
 ## Architecture
 
 ```
 src/
 ├── main.ts                  # Local entry point (bootstrap() + listen)
-├── bootstrap.ts             # configureApp(): вся общая конфигурация приложения
+├── bootstrap.ts             # configureApp(): all shared app configuration
 ├── app.module.ts            # Root module
-├── config/                  # Environment validation
-├── prisma/                  # Prisma client (global module)
+├── analytics/               # Shared analytics service (dashboard/products reuse it)
 ├── auth/                    # Auth module (JWT, guards, strategies, decorators)
-├── users/                   # User CRUD (admin only)
-├── markets/                 # Market CRUD with image upload
-├── products/                # Product CRUD with image upload
+├── categories/              # Product category CRUD
+├── common/                  # Shared: filters, interceptors (incl. idempotency), pipes, decorators
+├── config/                  # Environment validation
+├── dashboard/               # KPI stats, overview, revenue trend, payment distribution, sellers report
 ├── debtors/                 # Debtor CRUD
-├── transactions/            # Transactions + payments
-├── dashboard/               # Dashboard stats, revenue trend, payment distribution, sellers report
-├── common/                  # Shared: filters, interceptors, pipes, decorators
 ├── enums/                   # Shared enums
-└── interfaces/              # Shared interfaces
+├── health/                  # Health check
+├── interfaces/              # Shared interfaces
+├── markets/                 # Market CRUD with image upload
+├── prisma/                  # Prisma client (global module)
+├── products/                # Product CRUD with image upload
+├── profile/                 # Current-user profile (update, change password)
+├── sellers/                 # Seller CRUD + balance + credits
+├── transactions/            # Transactions + payments + refunds
+└── users/                   # User CRUD (admin only)
 api/
 └── index.ts                 # Vercel serverless entry (reuses configureApp)
 ```
 
-Patterns: modular design, repository pattern via PrismaService, global JWT guard with `@Public()` bypass, RBAC via `@Roles()` decorator, response transformation interceptor, global exception filter. Single app configuration in `src/bootstrap.ts` shared by both entry points (local + serverless).
+Patterns: modular design, repository pattern via PrismaService, RBAC via `@Roles()` decorator,
+response transformation interceptor, global exception filter. Single app configuration in
+`src/bootstrap.ts` shared by both entry points (local + serverless).
 
 ## Database Schema
 
-**Models:** User, , Market, Product, Debtor, Transaction, TransactionItem, Payment
+**Models:** User, Market, Category, Product, Debtor, Transaction, TransactionItem, Payment,
+SellerCredit, IdempotencyKey, ThrottleBucket
 
-- Market belongs to an owner (User)
-- Products, Debtors, Transactions are scoped to a Market
+**Enums:** `Role` (ADMIN/OWNER/SELLER), `TransactionType` (SALE/DEBT/REFUND),
+`PaymentType` (CASH/CARD/CREDIT), `TransactionStatus` (PAID/ACTIVE/PARTIAL/REFUNDED/PARTIALLY_REFUNDED),
+`ProductUnit` (PCS/KG/L/M/BOX)
+
+- Market belongs to an owner (User); Products, Debtors, Transactions are scoped to a Market
 - Transactions have items (snapshot of product, quantity, price) and optional payments
-- Payments reduce `remainingAmount` and update `status` (ACTIVE / PARTIAL / PAID)
+- Payments reduce `remainingAmount` and update `status`
+- Cascade deletes and indexes configured per audit fixes (July 2026)
 
 Full schema: `prisma/schema.prisma`
 
 ## API Endpoints
 
-All endpoints are prefixed with `/api`.
+All endpoints are prefixed with `/api`. Protected endpoints require `Authorization: Bearer <accessToken>`.
 
-### Auth
+### Auth & Health
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/auth/logout` | Bearer | Revoke  token |
+| POST | `/auth/login` | Public | Login (email/password, throttled 5/min) → `{ accessToken, user }` |
+| GET | `/health` | Public | DB health check |
+
+### Profile
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/profile` | Current user |
+| GET | `/profile/full` | Current user (expanded) |
+| PATCH | `/profile` | Update own profile |
+| PATCH | `/profile/password` | Change password |
 
 ### Users (admin only)
 
@@ -99,9 +128,9 @@ All endpoints are prefixed with `/api`.
 |--------|------|-------------|
 | POST | `/users` | Create user |
 | GET | `/users` | List users (search, filter by role, pagination) |
-| GET | `/users/:id` | Get user by ID |
+| GET | `/users/:id`, `/users/:id/full` | Get user |
 | PATCH | `/users/:id` | Update user |
-| DELETE | `/users/:id` | Delete user |
+| DELETE | `/users/:id` | Delete user (last-admin protection) |
 
 ### Markets
 
@@ -109,100 +138,76 @@ All endpoints are prefixed with `/api`.
 |--------|------|------|-------------|
 | POST | `/markets` | ADMIN | Create market (multipart with image) |
 | GET | `/markets` | Any | List markets |
-| GET | `/markets/:id` | Any | Get market by ID |
+| GET | `/markets/:id`, `/markets/:id/full` | Any | Get market |
 | PATCH | `/markets/:id` | ADMIN | Update market |
 | DELETE | `/markets/:id` | ADMIN | Delete market |
 
-### Products, Debtors, Transactions
+### Categories, Products, Debtors, Sellers
 
 CRUD endpoints scoped to the authenticated user's market:
 
+- `GET|POST /api/categories`, `/api/categories/:id`, `/api/categories/:id/full`
 - `GET|POST /api/products`, `/api/products/:id`
-- `GET|POST /api/debtors`, `/api/debtors/:id`
-- `GET|POST /api/transactions`, `/api/transactions/:id`
+- `GET|POST /api/debtors`, `/api/debtors/:id`, `/api/debtors/:id/full`
+- `GET|POST /api/sellers`, `/api/sellers/:id`, `/api/sellers/:id/full`
+- `GET /api/sellers/:id/balance` — seller balance
+- `POST|GET /api/sellers/:id/credits` — record / list credit operations
+
+### Transactions
+
+- `GET|POST /api/transactions`, `/api/transactions/:id`, `/api/transactions/:id/detail`
+- `PATCH /api/transactions/:id` — update
+- `DELETE /api/transactions/:id` — delete
 - `PATCH /api/transactions/:id/pay` — record a payment against a debt
-- `POST /api/transactions/:id/refund` — refund a sale
+- `POST /api/transactions/:id/refund` — refund a sale (full or partial)
+
+`POST /api/transactions` supports idempotency keys (dedup repeated submissions).
 
 ### Dashboard
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/dashboard?period=day\|week\|month\|year` | Any | KPI stats + `revenueTrend` (per-day for day/week/month, per-month for year) + `paymentDistribution` (CASH/CARD/CREDIT: count, amount, % of revenue) |
-| GET | `/dashboard/sellers-report?period=...` | Any | Revenue/debt/refund/cheque stats per seller |
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/dashboard?period=day\|week\|month\|year` | KPI stats |
+| GET | `/dashboard/overview?period=...` | Revenue trend + `paymentDistribution` (CASH/CARD/CREDIT: count, amount, % of revenue) |
+| GET | `/dashboard/sellers-report?period=...` | Revenue/debt/refund/cheque stats per seller |
 
-## Setup
+## Environment Variables
 
-### Prerequisites
-
-- Node.js 18+
-- npm
-- PostgreSQL database
-
-### Installation
-
-```bash
-git clone <repo-url>
-cd backend
-npm install
-```
-
-### Environment Variables
-
-Create a `.env` file:
+See `.env.example` for the full annotated list:
 
 ```env
-DATABASE_URL="postgresql://user:password@host:5432/db"
+DATABASE_URL="postgresql://user:password@host:5432/db?sslmode=require"
+DATABASE_POOL_MAX=10          # on Vercel use 2-3 (each serverless instance keeps its own pool)
 JWT_ACCESS_SECRET="your-access-secret"
 JWT_ACCESS_EXPIRES_IN="15m"
-CLOUDINARY_CLOUD_NAME="your-cloud-name"
-CLOUDINARY_API_KEY="your-api-key"
-CLOUDINARY_API_SECRET="your-api-secret"
-PORT=4000
+BCRYPT_ROUNDS=12
+PORT=4000                     # project convention: frontend expects :4000
 NODE_ENV=development
+CLOUDINARY_CLOUD_NAME="..."   CLOUDINARY_API_KEY="..."   CLOUDINARY_API_SECRET="..."
 ```
-
-### Database Setup
-
-```bash
-npx prisma generate
-npx prisma migrate dev
-```
-
-### Seed Data
-
-```bash
-npm run prisma:seed
-```
-
-Default credentials: `admin@tradecrm.com` / `12345678Aa`
-
-### Run
-
-```bash
-npm run start:dev
-```
-
-API: `http://localhost:4000/api`  
-Swagger docs: `http://localhost:4000/api/docs`
 
 ## Scripts
 
 | Script | Description |
 |--------|-------------|
-| `npm run build` | Compile to `dist/` |
-| `npm start` | Run production build |
+| `npm run build` | `prisma generate` + compile to `dist/` |
+| `npm start` | Run production build (`node dist/src/main`) |
 | `npm run start:dev` | Development with hot-reload |
 | `npm run prisma:generate` | Generate Prisma client |
-| `npm run prisma:migrate` | Run pending migrations |
+| `npm run prisma:migrate` | Apply pending migrations (dev) |
+| `npm run prisma:deploy` | Apply migrations in CI/prod |
 | `npm run prisma:studio` | Open Prisma Studio |
 | `npm run prisma:seed` | Seed database |
+| `npm test` | Unit tests (jest + ts-jest, mocked Prisma, no DB) |
+| `npm run test:watch` / `test:cov` | Watch mode / coverage |
 
 ## Auth Flow
 
-1. `POST /auth/login` with email/password → returns `{ accessToken,  user }`
+1. `POST /api/auth/login` with email/password → returns `{ accessToken, user }`
 2. Send `Authorization: Bearer <accessToken>` for protected endpoints
-3. `POST /auth/logout` revokes the  token
+3. On expiry re-login (no refresh-token rotation; cookies are not used)
 
 ## Project Status
 
-Early development (v0.1.0). Unit tests (jest + ts-jest, mocked Prisma, no DB access): 55 tests across 8 suites. Run with `npm test`.
+Early development (v0.1.0). Unit tests run without a database (Prisma is mocked); see `AGENTS.md`
+for detailed contributor guidelines, CI pipeline description, and TypeScript strictness settings.
