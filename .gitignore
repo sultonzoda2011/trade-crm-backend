@@ -1,12 +1,1 @@
-node_modules/
-dist/
-.env
-src/generated/
-*.tsbuildinfo
-coverage/
-prisma/generated/
-uploads/
-.vercel/
-.vercel
-PNG (transparent background)/
-*.log
+(empty)
