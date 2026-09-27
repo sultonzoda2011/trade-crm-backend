@@ -1,18 +1,21 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
-import { PrismaService } from '../prisma/prisma.service'
 import { PaginatedResult } from '../common/dto/pagination.dto'
 import { buildDateWhere, buildOrderBy, paginate } from '../common/utils/paginate.util'
 import { MS_PER_DAY, round2 } from '../common/utils/period.util'
+import { DebtorRisk, TransactionStatus } from '../enums'
+import { PrismaService } from '../prisma/prisma.service'
+import { QueryTransactionDto } from '../transactions/dto/query-transaction.dto'
+import { TransactionsService } from '../transactions/transactions.service'
 import { CreateDebtorDto } from './dto/create-debtor.dto'
 import { QueryDebtorDto } from './dto/query-debtor.dto'
 import { UpdateDebtorDto } from './dto/update-debtor.dto'
-import { DebtorRisk, TransactionStatus } from '../enums'
-import { TransactionsService } from '../transactions/transactions.service'
-import { QueryTransactionDto } from '../transactions/dto/query-transaction.dto'
 
 /** Превью транзакций должника на детальной странице — дальше кнопка "Все". */
 const DEBTOR_TRANSACTIONS_PREVIEW_LIMIT = 5
+
+/** Сколько товаров последней покупки показывать превью-миниатюрами на карточке. */
+const LAST_PURCHASE_ITEMS_LIMIT = 3
 
 const ACTIVE_DEBT_STATUSES: TransactionStatus[] = [TransactionStatus.ACTIVE, TransactionStatus.PARTIAL]
 
@@ -186,6 +189,20 @@ export interface DebtorDebtProfile extends DebtorRiskResult {
   daysSinceLastPayment: number | null
   lastPaymentAt: Date | null
   nextDueDate: Date | null
+  /**
+   * Транзакция для быстрого «Погасить долг» одним тапом из списка/карточки.
+   * Заполняется, только когда у должника РОВНО один активный долг — иначе
+   * непонятно, какую из транзакций гасить, и фронт вместо модалки платежа
+   * должен вести на страницу должника со списком.
+   */
+  activeDebtTransactionId: string | null
+  /** Последняя долговая покупка — для превью товаров на карточке должника. */
+  lastPurchase: DebtorLastPurchase | null
+}
+
+export interface DebtorLastPurchase {
+  at: Date
+  items: Array<{ productId: string; name: string; quantity: number; image: string | null }>
 }
 
 const EMPTY_PROFILE: DebtorDebtProfile = {
@@ -197,6 +214,8 @@ const EMPTY_PROFILE: DebtorDebtProfile = {
   totalCollected: 0,
   repaymentRate: 0,
   maxDaysOverdue: 0,
+  activeDebtTransactionId: null,
+  lastPurchase: null,
   daysSinceLastPayment: null,
   lastPaymentAt: null,
   nextDueDate: null,
@@ -282,6 +301,7 @@ export class DebtorsService {
         nextDueDate: Date | null
         totalIssued: number
         lastDebtAt: Date | null
+        soleActiveTransactionId: string | null
       }>
     >`
 			SELECT
@@ -313,7 +333,12 @@ export class DebtorsService {
 						AND t."dueDate" >= ${now}
 				) AS "nextDueDate",
 				COALESCE(SUM(t."totalAmount"), 0)::float AS "totalIssued",
-				MAX(t."createdAt") AS "lastDebtAt"
+				MAX(t."createdAt") AS "lastDebtAt",
+				-- Только когда активная долговая транзакция ровно одна: иначе фронту
+				-- нечем однозначно распорядиться при быстром "Погасить долг".
+				CASE WHEN COUNT(*) FILTER (WHERE t."status" IN ('ACTIVE', 'PARTIAL')) = 1
+					THEN MAX(t."id") FILTER (WHERE t."status" IN ('ACTIVE', 'PARTIAL'))
+					ELSE NULL END AS "soleActiveTransactionId"
 			FROM "Transaction" t
 			WHERE t."type" = 'DEBT'
 				AND t."debtorId" IN (${Prisma.join(debtorIds)})
@@ -337,6 +362,7 @@ export class DebtorsService {
 		`
 
     const payments = new Map(paymentRows.map(row => [row.debtorId, row]))
+    const lastPurchases = await this.getLastPurchases(debtorIds)
 
     // База сравнения размера долга — средний активный долг по этой выборке.
     const withDebt = rows.filter(row => Number(row.totalDebtAmount) > 0)
@@ -384,11 +410,71 @@ export class DebtorsService {
         daysSinceLastPayment,
         lastPaymentAt,
         nextDueDate: row.nextDueDate ?? null,
+        activeDebtTransactionId: row.soleActiveTransactionId ?? null,
+        lastPurchase: lastPurchases.get(row.debtorId) ?? null,
         ...scored,
       })
     }
 
     return profiles
+  }
+
+  /**
+   * Последняя DEBT-транзакция каждого должника + до 3 её товаров (для
+   * превью на карточке — "за что именно образовался долг"). Две отдельные
+   * группированные выборки на всю страницу вместо запроса на должника:
+   * DISTINCT ON берёт саму транзакцию, второй запрос — её позиции разом.
+   */
+  private async getLastPurchases(debtorIds: string[]): Promise<Map<string, DebtorLastPurchase>> {
+    if (debtorIds.length === 0) return new Map()
+
+    const lastTx = await this.prisma.$queryRaw<
+      Array<{ debtorId: string; transactionId: string; createdAt: Date }>
+    >`
+			SELECT DISTINCT ON (t."debtorId")
+				t."debtorId" AS "debtorId",
+				t."id" AS "transactionId",
+				t."createdAt" AS "createdAt"
+			FROM "Transaction" t
+			WHERE t."type" = 'DEBT'
+				AND t."debtorId" IN (${Prisma.join(debtorIds)})
+			ORDER BY t."debtorId", t."createdAt" DESC
+		`
+
+    if (lastTx.length === 0) return new Map()
+
+    const items = await this.prisma.transactionItem.findMany({
+      where: { transactionId: { in: lastTx.map(row => row.transactionId) } },
+      select: {
+        transactionId: true,
+        productId: true,
+        productName: true,
+        quantity: true,
+        product: { select: { image: true } },
+      },
+    })
+
+    const itemsByTx = new Map<string, DebtorLastPurchase['items']>()
+    for (const item of items) {
+      const list = itemsByTx.get(item.transactionId) ?? []
+      // Позиций может быть больше, чем нужно карточке — режем на лету, без
+      // отдельного query per transaction ради LIMIT.
+      if (list.length < LAST_PURCHASE_ITEMS_LIMIT) {
+        list.push({
+          productId: item.productId,
+          name: item.productName,
+          quantity: item.quantity,
+          image: item.product?.image ?? null,
+        })
+      }
+      itemsByTx.set(item.transactionId, list)
+    }
+
+    const result = new Map<string, DebtorLastPurchase>()
+    for (const row of lastTx) {
+      result.set(row.debtorId, { at: row.createdAt, items: itemsByTx.get(row.transactionId) ?? [] })
+    }
+    return result
   }
 
   async create(dto: CreateDebtorDto, marketId?: string) {
