@@ -1,1 +1,4 @@
-(empty)
+/dist
+node_modules/
+
+.env
