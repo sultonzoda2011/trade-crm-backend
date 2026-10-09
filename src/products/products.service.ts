@@ -26,9 +26,10 @@ import { UpdateProductDto } from './dto/update-product.dto'
 import { Express } from 'express'
 
 const productInclude = {
-	// address/category.image нигде не рендерятся (ни в списке, ни в карточке
-	// товара) — не тянем их лишний раз на каждую строку.
-	market: { select: { id: true, name: true, image: true } },
+	// category.image нигде не рендерится — не тянем его лишний раз на каждую
+	// строку. market.address нужен на странице товара (блок маркета), поэтому
+	// он есть, в отличие от products.market.image-only среза в других местах.
+	market: { select: { id: true, name: true, image: true, address: true } },
 	category: { select: { id: true, name: true } },
 	_count: { select: { transactionItems: true } }
 } as const

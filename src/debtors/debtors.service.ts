@@ -171,7 +171,7 @@ export function scoreDebtorRisk(input: DebtorRiskInput): DebtorRiskResult {
 }
 
 const debtorInclude = {
-  market: { select: { id: true, name: true, address: true } },
+  market: { select: { id: true, name: true, address: true, image: true } },
   _count: { select: { transactions: true } },
 } as const
 

@@ -126,28 +126,19 @@ Helpers in `src/common/utils/paginate.util.ts`:
 
 ## Auth flow
 
-**Auth is cookie-based, not Bearer.** `JwtStrategy` extracts the token *only* from the `accessToken` cookie via a custom `cookieExtractor` — an `Authorization: Bearer` header will **not** authenticate. The `@ApiBearerAuth()` decorators scattered around are decorative leftovers.
+**Auth is Bearer-token, not cookie-based.** This section used to describe an httpOnly-cookie + refresh-token-rotation design; that design was removed from the code (frontend migrated to `localStorage` + `Authorization: Bearer` on 2026-09-29) and this doc was never updated to match — treat anything below as current, not the old cookie/rotation text some earlier version of this file had.
 
-`AuthController` sets three cookies (all `secure` in production, `sameSite: production ? 'none' : 'lax'`, `path: '/'`):
-
-| Cookie | httpOnly | maxAge | Purpose |
-|---|---|---|---|
-| `accessToken` | **yes** | 15 min | JWT — the only accepted credential |
-| `user` | **no** | 30 days | `encodeURIComponent(JSON.stringify(AuthUserDto))` — read by the frontend for client-side RBAC |
+`JwtStrategy` extracts the token *only* from `Authorization: Bearer <token>` (`ExtractJwt.fromAuthHeaderAsBearerToken()`, `src/auth/strategies/jwt.strategy.ts`). There is no cookie extraction anywhere in `src/`.
 
 Endpoints:
 
-- `POST /api/auth/login` — `@Public()`, throttled 5/60s, `@HttpCode(200)`. Sets all 3 cookies. Body returns `{ accessToken, user }` — **`` is never in the response body**, the controller intercepts it into the cookie.
+- `POST /api/auth/login` — `@Public()`, throttled 5/60s, `@HttpCode(200)`. Body: `{ email, password }`. Response: `{ accessToken, user }` (`AuthResponseDto`) — both fields are returned in the JSON body; the client stores `accessToken` itself (localStorage) and sends it back as `Authorization: Bearer <accessToken>`.
+- **There is no `/api/auth/logout` endpoint, no refresh token, no token rotation, and no `RefreshToken` Prisma model.** The access token is a single long-lived-ish JWT (`JWT_ACCESS_EXPIRES_IN`, default `15m`) with no server-side revocation — logging out is purely a frontend action (clear `localStorage`). If reintroducing rotation/revocation/logout, it's new work, not restoring something that exists.
 
-- `POST /api/auth/logout` — **authenticated** (not `@Public()`), `@HttpCode(204)`. Clears all 3 cookies.
-
-Token internals (`auth.service.ts`):
+Token internals (`auth.service.ts` / `src/interfaces/jwt-payload.interface.ts`):
 
 - `JwtPayload` has 7 fields: `sub`, `email`, `role`, `id`, `name`, `image?`, `marketId?`.
-- Rotation is **atomic** — `updateMany` guarded by `revokedAt: null`.
-- **Reuse detection**: presenting an already-revoked token revokes *all* of that user's tokens and logs a warning. A lost concurrent-rotation race (`count === 0`) is treated the same way.
-- `parseDuration` regex is `^(\d+)([smhd])$`, falling back to **7d** on unparseable input.
-- Login and  both fire-and-forget `cleanupExpiredTokens`, which prunes expired `` rows *and* expired `ThrottleBucket` rows.
+- `AuthService.login()` verifies the password with bcrypt `compare`, then signs one JWT via `jwtService.signAsync(payload)` — no persistence, no rotation, no reuse detection.
 
 ## Transactions domain rules
 

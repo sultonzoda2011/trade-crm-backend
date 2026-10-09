@@ -22,9 +22,8 @@ export class AuthResponseDto {
   accessToken: string
 
   /**
-   * Только для внутреннего использования сервисом — контроллер
-   * перехватывает это значение, выставляет как httpOnly cookie
-   * и НЕ возвращает клиенту в теле ответа.
+   * Клиент хранит это сам (localStorage) и отправляет токен дальше как
+   * `Authorization: Bearer <accessToken>`. Cookie не используются.
    */
 
   @ApiProperty({ type: AuthUserDto })
