@@ -3,4 +3,5 @@ export enum TransactionStatus {
   ACTIVE = 'ACTIVE',
   PARTIAL = 'PARTIAL',
   REFUNDED = 'REFUNDED',
+  PARTIALLY_REFUNDED = 'PARTIALLY_REFUNDED',
 }
