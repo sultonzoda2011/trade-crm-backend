@@ -48,10 +48,12 @@ export function configureApp(app: NestExpressApplication): void {
 		// Cache-Control/Pragma добавлены фронтендом на КАЖДЫЙ GET (см.
 		// app/lib/client.ts) — без них Android WebView/OkHttp может тихо
 		// отдать закэшированный ответ вместо реального похода на сервер, и
-		// JS не в состоянии это отличить. Без явного allowedHeaders браузер
-		// (и WebView, если он не использует нативный CapacitorHttp-мост)
-		// заблокирует такой запрос ещё на CORS preflight.
-		allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma']
+		// JS не в состоянии это отличить. Idempotency-Key — на create/pay/refund
+		// транзакций (см. IdempotencyInterceptor, app/lib/offline-mutations.ts на
+		// фронте). Без явного allowedHeaders браузер (и WebView, если он не
+		// использует нативный CapacitorHttp-мост) заблокирует такой запрос ещё
+		// на CORS preflight.
+		allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma', 'Idempotency-Key']
 	})
 
 	app.useGlobalPipes(
