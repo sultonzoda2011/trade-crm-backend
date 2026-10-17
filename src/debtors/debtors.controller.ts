@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common'
-import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseInterceptors } from '@nestjs/common'
+import { ApiBearerAuth, ApiCreatedResponse, ApiHeader, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { DebtorRisk, Role } from '../enums'
@@ -12,6 +12,7 @@ import { UpdateDebtorDto } from './dto/update-debtor.dto'
 import { QueryDebtorDto } from './dto/query-debtor.dto'
 import { DebtorResponseDto } from './dto/debtor-response.dto'
 import { PaginatedResult } from '../common/dto/pagination.dto'
+import { IdempotencyInterceptor } from '../common/interceptors/idempotency.interceptor'
 
 @ApiTags('Debtors')
 @ApiBearerAuth()
@@ -21,6 +22,10 @@ export class DebtorsController {
   constructor(private readonly debtorsService: DebtorsService) {}
 
   @Post()
+  // Должника можно завести офлайн: клиент ставит создание в очередь и повторяет его на слабой сети,
+  // Idempotency-Key не даёт создать двойника при повторе (см. IdempotencyInterceptor).
+  @UseInterceptors(IdempotencyInterceptor)
+  @ApiHeader({ name: 'Idempotency-Key', required: false, description: 'Client-generated uuid to dedupe retried offline mutations' })
   @ApiCreatedResponse({ type: DebtorResponseDto })
   create(@Body() dto: CreateDebtorDto, @CurrentUser() user: JwtPayload) {
     return this.debtorsService.create(dto, user.marketId)
