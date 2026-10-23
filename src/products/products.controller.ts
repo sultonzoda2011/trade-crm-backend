@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common'
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
@@ -11,6 +11,7 @@ import { multerOptions } from '../common/utils/multipart.util'
 import { ProductsService } from './products.service'
 import { CreateProductDto } from './dto/create-product.dto'
 import { UpdateProductDto } from './dto/update-product.dto'
+import { RestockProductDto } from './dto/restock-product.dto'
 import { QueryProductDto } from './dto/query-product.dto'
 import { ProductResponseDto } from './dto/product-response.dto'
 import { PaginatedResult } from '../common/dto/pagination.dto'
@@ -111,6 +112,27 @@ export class ProductsController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.productsService.update(id, dto, file, user.marketId)
+  }
+
+  // Пополнение — отдельное действие, а не PATCH: PATCH перезаписывает остаток,
+  // а здесь число прибавляется к текущему внутри БД (см. ProductsService.restock).
+  @Post(':id/restock')
+  @Roles(Role.ADMIN, Role.OWNER)
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Add stock to a product',
+    description:
+      'Adds the given number of units to the current stock atomically. Use it when a delivery arrives: PATCH overwrites the quantity with a new total, restock adds to it, so sales made in the meantime are not lost.',
+  })
+  @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Product ID' })
+  @ApiBody({ type: RestockProductDto })
+  @ApiOkResponse({ type: ProductResponseDto, description: 'The product with the updated stock' })
+  restock(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RestockProductDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.productsService.restock(id, dto, user.marketId)
   }
 
   @Delete(':id')

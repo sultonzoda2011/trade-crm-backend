@@ -22,6 +22,7 @@ import {
 } from '../common/utils/paginate.util'
 import { CreateProductDto } from './dto/create-product.dto'
 import { QueryProductDto } from './dto/query-product.dto'
+import { MAX_STOCK, RestockProductDto } from './dto/restock-product.dto'
 import { UpdateProductDto } from './dto/update-product.dto'
 import { Express } from 'express'
 
@@ -459,6 +460,35 @@ export class ProductsService {
 			data,
 			include: productInclude
 		})
+	}
+
+	/**
+	 * Пополнение остатка: `quantity` прибавляется к текущему значению прямо в БД.
+	 *
+	 * Это не то же самое, что PATCH с новым количеством: форма правки записывает
+	 * число, которое человек видел на экране, и затирает продажи, прошедшие за
+	 * это время. Здесь инкремент считает сама БД, поэтому параллельные продажи
+	 * и пополнения не теряются — тот же приём, что у списания в transactions.
+	 */
+	async restock(id: string, dto: RestockProductDto, userMarketId?: string) {
+		await this.getProductOrThrow(id, userMarketId)
+
+		const { count } = await this.prisma.product.updateMany({
+			where: { id, quantity: { lte: MAX_STOCK - dto.quantity } },
+			data: { quantity: { increment: dto.quantity } }
+		})
+
+		if (count === 0) {
+			// Товар могли удалить между проверкой и обновлением — это 404, а не «лимит».
+			await this.getProductOrThrow(id, userMarketId)
+			throw new ConflictException({
+				message: 'Stock limit exceeded',
+				code: 'PRODUCT_STOCK_LIMIT',
+				details: { maxStock: MAX_STOCK }
+			})
+		}
+
+		return this.getProductOrThrow(id, userMarketId)
 	}
 
 	async remove(id: string, userMarketId?: string) {
