@@ -9,8 +9,8 @@ import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../common/services/storage.service'
 import {
 	AnalyticsService,
-	ProductMetrics,
-	ReorderPriority
+	compareReorderUrgency,
+	ProductMetrics
 } from '../analytics/analytics.service'
 import { PaginatedResult } from '../common/dto/pagination.dto'
 import { AnalyticsPeriod } from '../common/dto/period-query.dto'
@@ -40,15 +40,6 @@ interface ProductSalesRow {
 	unitsSold: number
 	refundedUnits: number
 	revenue: number
-}
-
-/** Порядок срочности закупки для сортировки выдачи. */
-const REORDER_PRIORITY_ORDER: Record<ReorderPriority, number> = {
-	[ReorderPriority.OUT_OF_STOCK]: 0,
-	[ReorderPriority.CRITICAL]: 1,
-	[ReorderPriority.WARNING]: 2,
-	[ReorderPriority.OK]: 3,
-	[ReorderPriority.NOT_NEEDED]: 4
 }
 
 /**
@@ -237,15 +228,7 @@ export class ProductsService {
 			b: { name: string; metrics: ProductMetrics }
 		) => {
 			if (!sortBy || sortBy === 'reorderPriority') {
-				const diff =
-					REORDER_PRIORITY_ORDER[a.metrics.reorderPriority] -
-					REORDER_PRIORITY_ORDER[b.metrics.reorderPriority]
-				// Внутри одной срочности первым идёт тот, у кого меньше запас в днях.
-				if (diff !== 0) return diff
-				return (
-					(a.metrics.daysOfStockRemaining ?? Number.POSITIVE_INFINITY) -
-					(b.metrics.daysOfStockRemaining ?? Number.POSITIVE_INFINITY)
-				)
+				return compareReorderUrgency(a.metrics, b.metrics)
 			}
 
 			if (sortBy === 'daysOfStockRemaining') {
@@ -457,10 +440,7 @@ export class ProductsService {
 		const data: any = { ...dto }
 
 		if (file) {
-			if (product.image) {
-				await this.storageService.delete(product.image)
-			}
-			data.image = await this.storageService.save(file, 'products')
+			data.image = await this.storageService.replace(product.image, file, 'products')
 		}
 
 		return this.prisma.product.update({

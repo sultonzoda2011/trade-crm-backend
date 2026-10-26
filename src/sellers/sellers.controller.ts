@@ -7,14 +7,11 @@ import {
 	Patch,
 	Post,
 	Query,
-	UploadedFile,
-	UseInterceptors
+	UploadedFile
 } from '@nestjs/common'
-import { FileInterceptor } from '@nestjs/platform-express'
 import {
 	ApiBearerAuth,
 	ApiBody,
-	ApiConsumes,
 	ApiCreatedResponse,
 	ApiOkResponse,
 	ApiOperation,
@@ -28,7 +25,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtPayload } from '../interfaces'
 import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe'
 import { ApiErrorResponse } from '../common/decorators/api-error-response.decorator'
-import { multerOptions } from '../common/utils/multipart.util'
+import { UploadImage } from '../common/decorators/upload-image.decorator'
 import { SellersService } from './sellers.service'
 import { CreateSellerDto } from './dto/create-seller.dto'
 import { UpdateSellerDto } from './dto/update-seller.dto'
@@ -50,11 +47,11 @@ export class SellersController {
 	constructor(private readonly sellersService: SellersService) {}
 
 	@Post()
+	@UploadImage()
 	@ApiOperation({
 		summary: 'Create a seller',
 		description: "Creates a new seller in the owner's market."
 	})
-	@ApiConsumes('multipart/form-data')
 	@ApiBody({
 		schema: {
 			type: 'object',
@@ -68,7 +65,6 @@ export class SellersController {
 		},
 	})
 	@ApiCreatedResponse({ type: SellerResponseDto })
-	@UseInterceptors(FileInterceptor('image', multerOptions))
 	create(
 		@Body() dto: CreateSellerDto,
 		@UploadedFile() file?: Express.Multer.File,
@@ -122,9 +118,9 @@ export class SellersController {
 	}
 
 	@Patch(':id')
+	@UploadImage()
 	@ApiOperation({ summary: 'Update a seller' })
 	@ApiParam({ name: 'id', type: String, format: 'uuid' })
-	@ApiConsumes('multipart/form-data')
 	@ApiBody({
 		schema: {
 			type: 'object',
@@ -137,7 +133,6 @@ export class SellersController {
 		},
 	})
 	@ApiOkResponse({ type: SellerResponseDto })
-	@UseInterceptors(FileInterceptor('image', multerOptions))
 	update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() dto: UpdateSellerDto,

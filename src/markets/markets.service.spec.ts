@@ -51,7 +51,7 @@ describe('MarketsService (IDOR scoping)', () => {
 			Promise.resolve({ ...marketRow, ...data })
 		)
 
-		service = new MarketsService(prisma, storageService)
+		service = new MarketsService(prisma, storageService, {} as any, {} as any, {} as any)
 	})
 
 	describe('update', () => {

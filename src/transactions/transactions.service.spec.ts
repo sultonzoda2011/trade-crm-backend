@@ -199,6 +199,7 @@ prisma.$transaction.mockImplementation((cb: any) =>
 				quantity: 2,
 				price: 100,
 				discount: 0,
+				markup: 0,
 				totalPrice: 200
 			})
 			expect(tx.product.updateMany).toHaveBeenCalledTimes(2)

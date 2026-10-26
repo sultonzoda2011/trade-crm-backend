@@ -1,7 +1,18 @@
 import { PrismaPg } from '@prisma/adapter-pg'
-import { PrismaClient, ProductUnit } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 import { hash } from 'bcrypt'
 import 'dotenv/config'
+import {
+	CATEGORY_DATA_1,
+	CATEGORY_DATA_2,
+	DEBTOR_DATA_1,
+	DEBTOR_DATA_2,
+	MARKET_1_PRODUCTS,
+	MARKET_1_SPEC,
+	MARKET_2_PRODUCTS,
+	MARKET_2_SPEC,
+	MarketSeedSpec
+} from './seed-data'
 
 const prisma = new PrismaClient({
 	adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! })
@@ -39,12 +50,12 @@ interface MarketUsers {
 	sellers: { id: string; name: string }[]
 }
 
-async function createMarket1(): Promise<MarketUsers> {
+async function createMarketWithStaff(spec: MarketSeedSpec): Promise<MarketUsers> {
 	const password = await hash('12345678Aa', 10)
 	const owner = await prisma.user.create({
 		data: {
-			name: 'Алишер Каримов',
-			email: 'alisher@tradecrm.com',
+			name: spec.owner.name,
+			email: spec.owner.email,
 			password,
 			role: 'OWNER',
 			image: null
@@ -52,8 +63,8 @@ async function createMarket1(): Promise<MarketUsers> {
 	})
 	const market = await prisma.market.create({
 		data: {
-			name: 'Рынок Центральный',
-			address: 'ул. Ленина, 15, г. Ташкент',
+			name: spec.name,
+			address: spec.address,
 			ownerId: owner.id,
 			image: null
 		}
@@ -62,101 +73,29 @@ async function createMarket1(): Promise<MarketUsers> {
 		where: { id: owner.id },
 		data: { marketId: market.id }
 	})
-	const s1 = await prisma.user.create({
-		data: {
-			name: 'Бахтияр Рахимов',
-			email: 'bakhtiyar@tradecrm.com',
-			password,
-			role: 'SELLER',
-			marketId: market.id,
-			image: null
-		}
-	})
-	const s2 = await prisma.user.create({
-		data: {
-			name: 'Мадина Юсупова',
-			email: 'madina@tradecrm.com',
-			password,
-			role: 'SELLER',
-			marketId: market.id,
-			image: null
-		}
-	})
-	return { market, owner, sellers: [s1, s2] }
+	const sellers = await Promise.all(
+		spec.sellers.map(s =>
+			prisma.user.create({
+				data: {
+					name: s.name,
+					email: s.email,
+					password,
+					role: 'SELLER',
+					marketId: market.id,
+					image: null
+				}
+			})
+		)
+	)
+	return { market, owner, sellers }
 }
 
-async function createMarket2(): Promise<MarketUsers> {
-	const password = await hash('12345678Aa', 10)
-	const owner = await prisma.user.create({
-		data: {
-			name: 'Дилноза Азимова',
-			email: 'dilnoza@tradecrm.com',
-			password,
-			role: 'OWNER',
-			image: null
-		}
-	})
-	const market = await prisma.market.create({
-		data: {
-			name: 'Рынок Восточный',
-			address: 'ул. Амира Темура, 42, г. Ташкент',
-			ownerId: owner.id,
-			image: null
-		}
-	})
-	await prisma.user.update({
-		where: { id: owner.id },
-		data: { marketId: market.id }
-	})
-	const s1 = await prisma.user.create({
-		data: {
-			name: 'Жасур Ахмедов',
-			email: 'jasur@tradecrm.com',
-			password,
-			role: 'SELLER',
-			marketId: market.id,
-			image: null
-		}
-	})
-	const s2 = await prisma.user.create({
-		data: {
-			name: 'Нигора Камилова',
-			email: 'nigora@tradecrm.com',
-			password,
-			role: 'SELLER',
-			marketId: market.id,
-			image: null
-		}
-	})
-	return { market, owner, sellers: [s1, s2] }
-}
-
-const categoryData1 = [
-	{
-		name: 'Молочные продукты',
-		description: 'Свежие молоко, йогурты, сыры и творог от местных ферм'
-	},
-	{
-		name: 'Хлебобулочные изделия',
-		description: 'Свежая выпечка, хлеб и лепёшки каждый день'
-	},
-	{
-		name: 'Овощи и фрукты',
-		description: 'Сезонные овощи и фрукты напрямую с базара'
-	},
-	{
-		name: 'Мясо и птица',
-		description: 'Свежее мясо, птица и мясные полуфабрикаты'
-	},
-	{
-		name: 'Бакалея',
-		description: 'Сахар, мука, масло и другие товары повседневного спроса'
-	}
-]
-
-async function createCategories(marketId: string, list: typeof categoryData1) {
+async function createCategories(
+	marketId: string,
+	list: typeof CATEGORY_DATA_1
+) {
 	return Promise.all(
-		list.map(async c =>
+		list.map(c =>
 			prisma.category.create({
 				data: {
 					name: c.name,
@@ -169,400 +108,10 @@ async function createCategories(marketId: string, list: typeof categoryData1) {
 	)
 }
 
-const categoryData2 = [
-	{
-		name: 'Напитки',
-		description: 'Вода, соки, газированные и горячие напитки'
-	},
-	{
-		name: 'Кондитерские изделия',
-		description: 'Шоколад, конфеты, зефир и другие сладости'
-	},
-	{
-		name: 'Морепродукты',
-		description: 'Свежая и мороженая рыба, креветки и мидии'
-	},
-	{
-		name: 'Крупы и макароны',
-		description: 'Крупы, макаронные изделия и бобовые'
-	},
-	{ name: 'Консервация', description: 'Консервы, маринады и томатная паста' }
-]
-
-const market1Products = [
-	{
-		name: 'Молоко свежее',
-		description: 'Жирность 3.2%, 1л',
-		price: 8000,
-		unit: ProductUnit.L,
-		quantity: 50
-	},
-	{
-		name: 'Кефир',
-		description: 'Жирность 2.5%, 1л',
-		price: 7000,
-		unit: ProductUnit.L,
-		quantity: 40
-	},
-	{
-		name: 'Сметана',
-		description: 'Жирность 20%, 400г',
-		price: 12000,
-		unit: ProductUnit.PCS,
-		quantity: 30
-	},
-	{
-		name: 'Творог',
-		description: 'Жирность 5%, 250г',
-		price: 15000,
-		unit: ProductUnit.PCS,
-		quantity: 25
-	},
-	{
-		name: 'Сыр твёрдый',
-		description: 'Голландский, 1кг',
-		price: 85000,
-		unit: ProductUnit.KG,
-		quantity: 10
-	},
-	{
-		name: 'Йогурт питьевой',
-		description: 'Клубничный, 0.5л',
-		price: 6000,
-		unit: ProductUnit.PCS,
-		quantity: 60
-	},
-	{
-		name: 'Хлеб белый',
-		description: 'Пшеничный, 600г',
-		price: 5000,
-		unit: ProductUnit.PCS,
-		quantity: 100
-	},
-	{
-		name: 'Хлеб чёрный',
-		description: 'Ржаной, 500г',
-		price: 4500,
-		unit: ProductUnit.PCS,
-		quantity: 80
-	},
-	{
-		name: 'Лепёшки',
-		description: 'Узбекские, 250г',
-		price: 3000,
-		unit: ProductUnit.PCS,
-		quantity: 120
-	},
-	{
-		name: 'Булочка сдобная',
-		description: 'С маком, 100г',
-		price: 2500,
-		unit: ProductUnit.PCS,
-		quantity: 90
-	},
-	{
-		name: 'Печенье овсяное',
-		description: '500г',
-		price: 12000,
-		unit: ProductUnit.PCS,
-		quantity: 35
-	},
-	{
-		name: 'Яблоки',
-		description: 'Красные, 1кг',
-		price: 10000,
-		unit: ProductUnit.KG,
-		quantity: 60
-	},
-	{
-		name: 'Бананы',
-		description: 'Свежие, 1кг',
-		price: 14000,
-		unit: ProductUnit.KG,
-		quantity: 45
-	},
-	{
-		name: 'Картофель',
-		description: 'Молодой, 1кг',
-		price: 5000,
-		unit: ProductUnit.KG,
-		quantity: 100
-	},
-	{
-		name: 'Помидоры',
-		description: 'Свежие, 1кг',
-		price: 12000,
-		unit: ProductUnit.KG,
-		quantity: 50
-	},
-	{
-		name: 'Огурцы',
-		description: 'Свежие, 1кг',
-		price: 8000,
-		unit: ProductUnit.KG,
-		quantity: 60
-	},
-	{
-		name: 'Лук репчатый',
-		description: '1кг',
-		price: 4000,
-		unit: ProductUnit.KG,
-		quantity: 80
-	},
-	{
-		name: 'Говядина',
-		description: 'Мякоть, 1кг',
-		price: 65000,
-		unit: ProductUnit.KG,
-		quantity: 20
-	},
-	{
-		name: 'Курица',
-		description: 'Целая тушка, 1кг',
-		price: 28000,
-		unit: ProductUnit.KG,
-		quantity: 30
-	},
-	{
-		name: 'Фарш мясной',
-		description: 'Говяжий, 500г',
-		price: 25000,
-		unit: ProductUnit.PCS,
-		quantity: 25
-	},
-	{
-		name: 'Колбаса варёная',
-		description: 'Докторская, 400г',
-		price: 18000,
-		unit: ProductUnit.PCS,
-		quantity: 30
-	},
-	{
-		name: 'Яйца куриные',
-		description: 'Десяток, 10шт',
-		price: 14000,
-		unit: ProductUnit.BOX,
-		quantity: 40
-	},
-	{
-		name: 'Масло подсолнечное',
-		description: '1л',
-		price: 16000,
-		unit: ProductUnit.L,
-		quantity: 35
-	},
-	{
-		name: 'Сахар',
-		description: '1кг',
-		price: 11000,
-		unit: ProductUnit.KG,
-		quantity: 50
-	},
-	{
-		name: 'Рис',
-		description: 'Девзира, 1кг',
-		price: 15000,
-		unit: ProductUnit.KG,
-		quantity: 40
-	},
-	{
-		name: 'Мука пшеничная',
-		description: '1кг',
-		price: 7000,
-		unit: ProductUnit.KG,
-		quantity: 3
-	}
-]
-
-const market2Products = [
-	{
-		name: 'Вода минеральная',
-		description: 'Газированная, 0.5л',
-		price: 3000,
-		unit: ProductUnit.PCS,
-		quantity: 200
-	},
-	{
-		name: 'Сок яблочный',
-		description: '1л',
-		price: 10000,
-		unit: ProductUnit.L,
-		quantity: 60
-	},
-	{
-		name: 'Кола',
-		description: '0.5л',
-		price: 7000,
-		unit: ProductUnit.PCS,
-		quantity: 150
-	},
-	{
-		name: 'Чай зелёный',
-		description: 'Листовой, 100г',
-		price: 12000,
-		unit: ProductUnit.PCS,
-		quantity: 30
-	},
-	{
-		name: 'Кофе растворимый',
-		description: '100г',
-		price: 25000,
-		unit: ProductUnit.PCS,
-		quantity: 20
-	},
-	{
-		name: 'Шоколад молочный',
-		description: '90г',
-		price: 15000,
-		unit: ProductUnit.PCS,
-		quantity: 40
-	},
-	{
-		name: 'Пирожное',
-		description: 'Корзиночка, 1шт',
-		price: 5000,
-		unit: ProductUnit.PCS,
-		quantity: 60
-	},
-	{
-		name: 'Зефир',
-		description: 'Ванильный, 250г',
-		price: 11000,
-		unit: ProductUnit.PCS,
-		quantity: 25
-	},
-	{
-		name: 'Мармелад',
-		description: 'Фруктовый, 300г',
-		price: 13000,
-		unit: ProductUnit.PCS,
-		quantity: 30
-	},
-	{
-		name: 'Вафли',
-		description: 'С шоколадной начинкой, 200г',
-		price: 9000,
-		unit: ProductUnit.PCS,
-		quantity: 35
-	},
-	{
-		name: 'Сёмга слабосолёная',
-		description: '200г',
-		price: 35000,
-		unit: ProductUnit.PCS,
-		quantity: 15
-	},
-	{
-		name: 'Креветки',
-		description: 'Мороженые, 1кг',
-		price: 55000,
-		unit: ProductUnit.KG,
-		quantity: 10
-	},
-	{
-		name: 'Мидии',
-		description: 'В створах, 1кг',
-		price: 40000,
-		unit: ProductUnit.KG,
-		quantity: 8
-	},
-	{
-		name: 'Рыба красная',
-		description: 'Форель, 1кг',
-		price: 70000,
-		unit: ProductUnit.KG,
-		quantity: 12
-	},
-	{
-		name: 'Кальмары',
-		description: 'Мороженые, 500г',
-		price: 22000,
-		unit: ProductUnit.PCS,
-		quantity: 15
-	},
-	{
-		name: 'Гречка',
-		description: '1кг',
-		price: 12000,
-		unit: ProductUnit.KG,
-		quantity: 35
-	},
-	{
-		name: 'Макароны',
-		description: 'Спагетти, 400г',
-		price: 6000,
-		unit: ProductUnit.PCS,
-		quantity: 50
-	},
-	{
-		name: 'Овсянка',
-		description: 'Геркулес, 500г',
-		price: 8000,
-		unit: ProductUnit.PCS,
-		quantity: 30
-	},
-	{
-		name: 'Рис круглозёрный',
-		description: '1кг',
-		price: 13000,
-		unit: ProductUnit.KG,
-		quantity: 40
-	},
-	{
-		name: 'Чечевица',
-		description: 'Красная, 500г',
-		price: 9000,
-		unit: ProductUnit.PCS,
-		quantity: 20
-	},
-	{
-		name: 'Горошек зелёный',
-		description: 'Консервированный, 400г',
-		price: 8000,
-		unit: ProductUnit.PCS,
-		quantity: 35
-	},
-	{
-		name: 'Тушёнка говяжья',
-		description: 'Банка 350г',
-		price: 22000,
-		unit: ProductUnit.PCS,
-		quantity: 25
-	},
-	{
-		name: 'Рыбные консервы',
-		description: 'Сайра в масле, 250г',
-		price: 15000,
-		unit: ProductUnit.PCS,
-		quantity: 30
-	},
-	{
-		name: 'Кукуруза консервированная',
-		description: 'Банка 340г',
-		price: 9000,
-		unit: ProductUnit.PCS,
-		quantity: 28
-	},
-	{
-		name: 'Огурцы маринованные',
-		description: 'Банка 500г',
-		price: 14000,
-		unit: ProductUnit.PCS,
-		quantity: 22
-	},
-	{
-		name: 'Томатная паста',
-		description: '250г',
-		price: 7000,
-		unit: ProductUnit.PCS,
-		quantity: 0
-	}
-]
-
 async function createAllProducts(
 	marketId: string,
 	categories: { id: string }[],
-	productList: typeof market1Products
+	productList: typeof MARKET_1_PRODUCTS
 ) {
 	const products: { id: string; name: string; price: number }[] = []
 	for (let i = 0; i < categories.length; i++) {
@@ -587,23 +136,7 @@ async function createAllProducts(
 	return products
 }
 
-const debtorData1 = [
-	{ name: 'Салимов Азиз', phone: '+998901234567' },
-	{ name: 'Рахимова Гульноза', phone: '+998902345678' },
-	{ name: 'Умаров Бахтиёр', phone: '+998903456789' },
-	{ name: 'Каримова Зухра', phone: '+998904567890' },
-	{ name: 'Турсунов Фаррух', phone: '+998905678901' }
-]
-
-const debtorData2 = [
-	{ name: 'Азимова Наргиза', phone: '+998911234567' },
-	{ name: 'Собиров Джамшид', phone: '+998912345678' },
-	{ name: 'Исламова Мухаббат', phone: '+998913456789' },
-	{ name: 'Хакимов Шерзод', phone: '+998914567890' },
-	{ name: 'Усманова Лола', phone: '+998915678901' }
-]
-
-async function createDebtors(marketId: string, list: typeof debtorData1) {
+async function createDebtors(marketId: string, list: typeof DEBTOR_DATA_1) {
 	return Promise.all(
 		list.map(d => prisma.debtor.create({ data: { ...d, marketId } }))
 	)
@@ -689,8 +222,6 @@ function buildTxnDefs(
 			paymentType: payers[i % payers.length],
 			status: 'PAID',
 			createdById: seller.id,
-			// Раз в ~2 дня, но со сдвигом по часам, чтобы транзакции одного дня
-			// не сваливались в одну точку времени (график по часам не пустой).
 			daysAgo: i * 2 + (i % 6) / 6,
 			items
 		})
@@ -838,7 +369,6 @@ async function createSellerCredits(
 				amount: payoutAmount,
 				note: 'Частичная выплата накопленной надбавки',
 				createdById: owner.id,
-				// выдано неделю назад — остаток продолжает копиться после этой даты
 				createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 			}
 		})
@@ -978,33 +508,33 @@ async function main() {
 	console.log(`  ✓ Администратор: ${admin.email}`)
 
 	console.log('Создание Рынка Центральный...')
-	const m1 = await createMarket1()
+	const m1 = await createMarketWithStaff(MARKET_1_SPEC)
 	console.log(`  ✓ Рынок: ${m1.market.id}`)
 	console.log('Создание Рынка Восточный...')
-	const m2 = await createMarket2()
+	const m2 = await createMarketWithStaff(MARKET_2_SPEC)
 	console.log(`  ✓ Рынок: ${m2.market.id}`)
 
 	console.log('Создание категорий...')
-	const cats1 = await createCategories(m1.market.id, categoryData1)
-	const cats2 = await createCategories(m2.market.id, categoryData2)
+	const cats1 = await createCategories(m1.market.id, CATEGORY_DATA_1)
+	const cats2 = await createCategories(m2.market.id, CATEGORY_DATA_2)
 	console.log(`  ✓ Категории: ${cats1.length + cats2.length}`)
 
 	console.log('Создание товаров...')
 	const products1 = await createAllProducts(
 		m1.market.id,
 		cats1,
-		market1Products
+		MARKET_1_PRODUCTS
 	)
 	const products2 = await createAllProducts(
 		m2.market.id,
 		cats2,
-		market2Products
+		MARKET_2_PRODUCTS
 	)
 	console.log(`  ✓ Товары: ${products1.length + products2.length}`)
 
 	console.log('Создание должников...')
-	const debtors1 = await createDebtors(m1.market.id, debtorData1)
-	const debtors2 = await createDebtors(m2.market.id, debtorData2)
+	const debtors1 = await createDebtors(m1.market.id, DEBTOR_DATA_1)
+	const debtors2 = await createDebtors(m2.market.id, DEBTOR_DATA_2)
 	console.log(`  ✓ Должники: ${debtors1.length + debtors2.length}`)
 
 	console.log('Создание транзакций (за последние ~60 дней)...')

@@ -89,10 +89,7 @@ export class ProfileService {
 		if (dto.email !== undefined) data.email = dto.email
 
 		if (file) {
-			if (user.image) {
-				await this.storageService.delete(user.image)
-			}
-			data.image = await this.storageService.save(file, 'users')
+			data.image = await this.storageService.replace(user.image, file, 'users')
 		}
 
 		return this.prisma.user.update({
@@ -117,13 +114,9 @@ export class ProfileService {
 			throw new BadRequestException('Current password is incorrect')
 		}
 
-		await this.prisma.$transaction(async tx => {
-			await tx.user.update({
-				where: { id: userId },
-				data: { password: await hash(dto.newPassword, 10) }
-			})
-
-	
+		await this.prisma.user.update({
+			where: { id: userId },
+			data: { password: await hash(dto.newPassword, 10) }
 		})
 	}
 }

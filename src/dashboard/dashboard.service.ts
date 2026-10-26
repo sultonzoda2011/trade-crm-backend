@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
-import { AnalyticsService, ProductHealth, ReorderPriority } from '../analytics/analytics.service'
+import {
+	AnalyticsService,
+	compareReorderUrgency,
+	ProductHealth
+} from '../analytics/analytics.service'
 import { AnalyticsPeriod } from '../common/dto/period-query.dto'
 import {
 	buildComparison,
@@ -15,45 +19,13 @@ import {
 	MetricsScope
 } from './dashboard-metrics.service'
 import { DashboardInsightsService } from './dashboard-insights.service'
+import { DashboardSellersService } from './dashboard-sellers.service'
 import { DashboardPeriod, QueryDashboardDto } from './dto/query-dashboard.dto'
 
 interface RevenueTrendRow {
 	date: Date
 	revenue: number
 	transactionCount: bigint
-}
-
-/** Порядок срочности закупки — тот же, что в списке товаров. */
-const REORDER_ORDER: Record<ReorderPriority, number> = {
-	[ReorderPriority.OUT_OF_STOCK]: 0,
-	[ReorderPriority.CRITICAL]: 1,
-	[ReorderPriority.WARNING]: 2,
-	[ReorderPriority.OK]: 3,
-	[ReorderPriority.NOT_NEEDED]: 4
-}
-
-interface SellerTotals {
-	grossSales: number
-	netSales: number
-	salesCount: number
-	refundsAmount: number
-	refundsCount: number
-	debtsAmount: number
-	debtsCount: number
-	collectedAmount: number
-	collectedCount: number
-}
-
-const EMPTY_SELLER_TOTALS: SellerTotals = {
-	grossSales: 0,
-	netSales: 0,
-	salesCount: 0,
-	refundsAmount: 0,
-	refundsCount: 0,
-	debtsAmount: 0,
-	debtsCount: 0,
-	collectedAmount: 0,
-	collectedCount: 0
 }
 
 /**
@@ -67,65 +39,19 @@ function toAnalyticsPeriod(
 	return period as unknown as AnalyticsPeriod | undefined
 }
 
-function buildPeriodDateRange(period: DashboardPeriod) {
-	const now = new Date()
-	const end = new Date(
-		Date.UTC(
-			now.getUTCFullYear(),
-			now.getUTCMonth(),
-			now.getUTCDate(),
-			23,
-			59,
-			59,
-			999
-		)
-	)
-
-	switch (period) {
-		case DashboardPeriod.TODAY: {
-			const start = new Date(
-				Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
-			)
-			return { gte: start, lte: end }
-		}
-		case DashboardPeriod.WEEK: {
-			const monday = new Date(
-				Date.UTC(
-					now.getUTCFullYear(),
-					now.getUTCMonth(),
-					now.getUTCDate() - ((now.getUTCDay() + 6) % 7)
-				)
-			)
-			return { gte: monday, lte: end }
-		}
-		case DashboardPeriod.MONTH:
-			return {
-				gte: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)),
-				lte: end
-			}
-		case DashboardPeriod.YEAR:
-			return {
-				gte: new Date(Date.UTC(now.getUTCFullYear(), 0, 1)),
-				lte: end
-			}
-	}
-}
-
-// Границы периода: границы считаются в UTC, чтобы фильтр, date_trunc-бакеты
-// (UTC-сессия БД) и метки дней (formatSqlDate) не расходились.
-// Без period/dateFrom/dateTo по умолчанию берётся текущий месяц — вместо
-// полного скана всей истории транзакций.
 function buildDateFilter(
 	query: QueryDashboardDto
 ): { gte?: Date; lte?: Date } {
-	if (query.period) return buildPeriodDateRange(query.period)
+	if (query.period) {
+		return resolvePeriod({ period: toAnalyticsPeriod(query.period) }).current
+	}
 	if (query.dateFrom || query.dateTo) {
 		const filter: { gte?: Date; lte?: Date } = {}
 		if (query.dateFrom) filter.gte = new Date(query.dateFrom)
 		if (query.dateTo) filter.lte = new Date(query.dateTo)
 		return filter
 	}
-	return buildPeriodDateRange(DashboardPeriod.MONTH)
+	return resolvePeriod({ period: AnalyticsPeriod.MONTH }).current
 }
 
 @Injectable()
@@ -134,7 +60,8 @@ export class DashboardService {
 		private readonly prisma: PrismaService,
 		private readonly metrics: DashboardMetricsService,
 		private readonly insights: DashboardInsightsService,
-		private readonly analytics: AnalyticsService
+		private readonly analytics: AnalyticsService,
+		private readonly sellers?: DashboardSellersService
 	) {}
 
 	/**
@@ -432,6 +359,13 @@ export class DashboardService {
 		}
 	}
 
+	async getSellersReport(query: QueryDashboardDto, marketId?: string) {
+		return (this.sellers ?? new DashboardSellersService(this.prisma)).getSellersReport(
+			query,
+			marketId
+		)
+	}
+
 	/**
 	 * Состояние склада + список «что заказать».
 	 *
@@ -502,16 +436,7 @@ export class DashboardService {
 			// Список закупки: сначала самое срочное, потом по остатку дней.
 			reorder: enriched
 				.filter(p => p.metrics.recommendedQuantity > 0)
-				.sort((a, b) => {
-					const diff =
-						REORDER_ORDER[a.metrics.reorderPriority] -
-						REORDER_ORDER[b.metrics.reorderPriority]
-					if (diff !== 0) return diff
-					return (
-						(a.metrics.daysOfStockRemaining ?? Infinity) -
-						(b.metrics.daysOfStockRemaining ?? Infinity)
-					)
-				})
+				.sort((a, b) => compareReorderUrgency(a.metrics, b.metrics))
 				.slice(0, 10)
 		}
 	}
@@ -539,170 +464,6 @@ export class DashboardService {
 				previousMap.get(row.categoryId ?? 'none') ?? 0
 			)
 		}))
-	}
-
-	/**
-	 * Отчёт по продавцам с сравнением к предыдущему периоду.
-	 *
-	 * Возврат вычитается из результата того продавца, который совершил исходную
-	 * SALE (через refundOf.createdById), а не того, кто оформил возврат —
-	 * иначе оформление возвратов портило бы показатели случайного сотрудника.
-	 */
-	async getSellersReport(query: QueryDashboardDto, marketId?: string) {
-		const period = resolvePeriod({
-			period: toAnalyticsPeriod(query.period),
-			dateFrom: query.dateFrom,
-			dateTo: query.dateTo
-		})
-
-		const [current, previous] = await Promise.all([
-			this.getSellerTotals(period.current, marketId, query.sellerId),
-			this.getSellerTotals(period.previous, marketId, query.sellerId)
-		])
-
-		const sellerIds = [...new Set([...current.keys(), ...previous.keys()])]
-
-		const sellers = sellerIds.length
-			? await this.prisma.user.findMany({
-					where: { id: { in: sellerIds } },
-					select: { id: true, name: true, email: true, image: true, role: true }
-				})
-			: []
-		const sellerMap = new Map(sellers.map(s => [s.id, s]))
-
-		const rows = sellerIds.map(id => {
-			const now = current.get(id) ?? EMPTY_SELLER_TOTALS
-			const before = previous.get(id) ?? EMPTY_SELLER_TOTALS
-
-			return {
-				seller: sellerMap.get(id) ?? null,
-				salesCount: now.salesCount,
-				salesAmount: now.netSales,
-				grossSalesAmount: now.grossSales,
-				refundsCount: now.refundsCount,
-				refundsAmount: now.refundsAmount,
-				debtsCount: now.debtsCount,
-				debtsAmount: now.debtsAmount,
-				collectedAmount: now.collectedAmount,
-				collectedCount: now.collectedCount,
-				transactionCount: now.salesCount + now.debtsCount,
-				averageTransaction:
-					now.salesCount + now.debtsCount > 0
-						? round2(
-								(now.netSales + now.debtsAmount) /
-									(now.salesCount + now.debtsCount)
-							)
-						: 0,
-				// Доля возвратов от валовых продаж продавца — сопоставима между
-				// продавцами разного объёма, в отличие от абсолютной суммы.
-				returnRate:
-					now.grossSales > 0 ? round2(now.refundsAmount / now.grossSales) : 0,
-				comparison: {
-					salesAmount: buildComparison(now.netSales, before.netSales),
-					salesCount: buildComparison(now.salesCount, before.salesCount),
-					debtsAmount: buildComparison(now.debtsAmount, before.debtsAmount),
-					refundsAmount: buildComparison(
-						now.refundsAmount,
-						before.refundsAmount
-					),
-					collectedAmount: buildComparison(
-						now.collectedAmount,
-						before.collectedAmount
-					)
-				}
-			}
-		})
-
-		// Лучший продавец сверху: сортируем по чистым продажам.
-		return rows.sort((a, b) => b.salesAmount - a.salesAmount)
-	}
-
-	/**
-	 * Сырые итоги по каждому продавцу за одно окно. Вынесено отдельно, чтобы
-	 * текущий и предыдущий период считались одним и тем же кодом — иначе
-	 * сравнение легко становится сравнением двух разных определений метрики.
-	 */
-	private async getSellerTotals(
-		range: { gte: Date; lte: Date },
-		marketId?: string,
-		sellerId?: string
-	): Promise<Map<string, SellerTotals>> {
-		const where: Prisma.TransactionWhereInput = {
-			createdAt: { gte: range.gte, lte: range.lte }
-		}
-		if (marketId) where.marketId = marketId
-		if (sellerId) where.createdById = sellerId
-
-		const paymentWhere: Prisma.PaymentWhereInput = {
-			createdAt: { gte: range.gte, lte: range.lte }
-		}
-		if (marketId) paymentWhere.transaction = { marketId }
-		if (sellerId) paymentWhere.createdById = sellerId
-
-		const [saleGroups, debtGroups, refundRows, paymentGroups] =
-			await Promise.all([
-				this.prisma.transaction.groupBy({
-					by: ['createdById'],
-					where: { ...where, type: 'SALE' },
-					_sum: { totalAmount: true },
-					_count: { id: true }
-				}),
-				this.prisma.transaction.groupBy({
-					by: ['createdById'],
-					where: { ...where, type: 'DEBT' },
-					_sum: { totalAmount: true },
-					_count: { id: true }
-				}),
-				this.prisma.transaction.findMany({
-					where: { ...where, type: 'REFUND' },
-					select: {
-						totalAmount: true,
-						refundOf: { select: { createdById: true } }
-					}
-				}),
-				this.prisma.payment.groupBy({
-					by: ['createdById'],
-					where: paymentWhere,
-					_sum: { amount: true },
-					_count: { id: true }
-				})
-			])
-
-		const totals = new Map<string, SellerTotals>()
-		const ensure = (id: string): SellerTotals => {
-			const existing = totals.get(id)
-			if (existing) return existing
-			const created = { ...EMPTY_SELLER_TOTALS }
-			totals.set(id, created)
-			return created
-		}
-
-		for (const group of saleGroups) {
-			const row = ensure(group.createdById)
-			row.grossSales = round2(group._sum.totalAmount ?? 0)
-			row.netSales = row.grossSales
-			row.salesCount = group._count.id
-		}
-		for (const group of debtGroups) {
-			const row = ensure(group.createdById)
-			row.debtsAmount = round2(group._sum.totalAmount ?? 0)
-			row.debtsCount = group._count.id
-		}
-		for (const refund of refundRows) {
-			const sellerOfSale = refund.refundOf?.createdById
-			if (!sellerOfSale) continue
-			const row = ensure(sellerOfSale)
-			row.refundsAmount = round2(row.refundsAmount + refund.totalAmount)
-			row.refundsCount += 1
-			row.netSales = round2(row.netSales - refund.totalAmount)
-		}
-		for (const group of paymentGroups) {
-			const row = ensure(group.createdById)
-			row.collectedAmount = round2(group._sum.amount ?? 0)
-			row.collectedCount = group._count.id
-		}
-
-		return totals
 	}
 
 	/**

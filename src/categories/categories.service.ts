@@ -102,10 +102,7 @@ export class CategoriesService {
     const data: any = { ...dto }
 
     if (file) {
-      if (category.image) {
-        await this.storageService.delete(category.image)
-      }
-      data.image = await this.storageService.save(file, 'categories')
+      data.image = await this.storageService.replace(category.image, file, 'categories')
     }
 
     return this.prisma.category.update({ where: { id }, data, include: { _count: { select: { products: true } } } })

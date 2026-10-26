@@ -12,8 +12,8 @@ import {
 	buildOrderBy,
 	paginate
 } from '../common/utils/paginate.util'
-import { DUE_SOON_DAYS, MS_PER_DAY, round2 } from '../common/utils/period.util'
-import { DebtStatusFilter, Role, TransactionType } from '../enums'
+import { round2 } from '../common/utils/period.util'
+import { Role, TransactionType } from '../enums'
 import { JwtPayload } from '../interfaces'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreatePaymentDto } from './dto/create-payment.dto'
@@ -21,84 +21,13 @@ import { CreateTransactionDto } from './dto/create-transaction.dto'
 import { QueryTransactionDto } from './dto/query-transaction.dto'
 import { RefundTransactionDto } from './dto/refund-transaction.dto'
 import { UpdateTransactionDto } from './dto/update-transaction.dto'
-
-const transactionInclude = {
-	items: {
-		include: {
-			product: { select: { id: true, name: true, price: true, image: true } }
-		}
-	},
-	createdBy: { select: { id: true, name: true, email: true, image: true } },
-	debtor: { select: { id: true, name: true, phone: true } },
-	market: { select: { id: true, name: true, address: true, image: true } },
-	payments: {
-		include: {
-			createdBy: { select: { id: true, name: true, email: true, image: true } }
-		},
-		orderBy: { createdAt: 'desc' }
-	}
-} as const
-
-/**
- * Облегчённый include для пагинированного списка транзакций.
- *
- * Список рендерит только превью товаров и должника — payments/createdBy/полный
- * market ему не нужны (не отображаются ни в таблице, ни в мобильной карточке),
- * но раньше тянулись на каждую из 20 строк каждой страницы. History платежей
- * и подробности market/createdBy остаются в transactionDetailInclude — они
- * нужны только на карточке одной транзакции.
- */
-const transactionListInclude = {
-	items: {
-		include: {
-			product: { select: { id: true, name: true, price: true, image: true } }
-		}
-	},
-	debtor: { select: { id: true, name: true, phone: true } },
-	market: { select: { id: true, name: true } }
-} as const
-
-/**
- * Детальный include: дополнительно тянет связанные возвраты и исходную продажу,
- * чтобы страница транзакции показывала весь бизнес-процесс
- * (Sale → Payment → Refund) без второго round-trip.
- * В списках не используется намеренно — там это лишние джойны на каждую строку.
- */
-const transactionDetailInclude = {
-	...transactionInclude,
-	refundOf: {
-		select: {
-			id: true,
-			type: true,
-			status: true,
-			totalAmount: true,
-			createdAt: true,
-			createdBy: { select: { id: true, name: true } }
-		}
-	},
-	refunds: {
-		select: {
-			id: true,
-			type: true,
-			status: true,
-			totalAmount: true,
-			createdAt: true,
-			createdBy: { select: { id: true, name: true } },
-			items: {
-				select: {
-					id: true,
-					productId: true,
-					productName: true,
-					quantity: true,
-					price: true,
-					totalPrice: true,
-					refundOfItemId: true
-				}
-			}
-		},
-		orderBy: { createdAt: 'asc' }
-	}
-} as const
+import {
+	applyDebtStatusFilter,
+	buildTransactionTimeline,
+	transactionDetailInclude,
+	transactionInclude,
+	transactionListInclude
+} from './transactions.helpers'
 
 @Injectable()
 export class TransactionsService {
@@ -260,7 +189,7 @@ export class TransactionsService {
 			if (query.minAmount != null) where.totalAmount.gte = query.minAmount
 			if (query.maxAmount != null) where.totalAmount.lte = query.maxAmount
 		}
-		if (query.debtStatus) this.applyDebtStatusFilter(where, query.debtStatus)
+		if (query.debtStatus) applyDebtStatusFilter(where, query.debtStatus)
 
 		return paginate(
 			query,
@@ -280,45 +209,6 @@ export class TransactionsService {
 				}),
 			() => this.prisma.transaction.count({ where })
 		)
-	}
-
-	/**
-	 * «Просрочен» и «скоро срок» — это состояния на момент запроса, а не
-	 * колонки в БД, поэтому фильтр выводится из status + dueDate. Долг без
-	 * dueDate не может быть просроченным: срок ему не назначали.
-	 *
-	 * Фильтр всегда сужает выборку до type = DEBT: у продажи нет срока оплаты,
-	 * и включать её в «просроченные» означало бы врать в цифрах.
-	 */
-	private applyDebtStatusFilter(
-		where: Prisma.TransactionWhereInput,
-		debtStatus: DebtStatusFilter,
-		now: Date = new Date()
-	): void {
-		// Условия кладём в AND, а не в where.type / where.status: иначе фильтр затирал бы
-		// явно выбранные «Тип» и «Статус» (тип «Продажа» + «Просрочен» отдавал бы долги).
-		// Несовместимые выборы — «Продажа» + любое состояние долга, «Активна» + «Закрыт» —
-		// теперь дают пустой список, а не чужие строки.
-		const conditions: Prisma.TransactionWhereInput[] = [{ type: 'DEBT' }]
-
-		if (debtStatus === DebtStatusFilter.SETTLED) {
-			conditions.push({ status: 'PAID' })
-		} else {
-			conditions.push({ status: { in: ['ACTIVE', 'PARTIAL'] } })
-
-			if (debtStatus === DebtStatusFilter.OVERDUE) {
-				conditions.push({ dueDate: { lt: now } })
-			} else if (debtStatus === DebtStatusFilter.DUE_SOON) {
-				conditions.push({
-					dueDate: {
-						gte: now,
-						lte: new Date(now.getTime() + DUE_SOON_DAYS * MS_PER_DAY)
-					}
-				})
-			}
-		}
-
-		where.AND = conditions
 	}
 
 	async findOne(id: string, userMarketId?: string) {
@@ -364,30 +254,6 @@ export class TransactionsService {
 			transaction.refunds.reduce((sum, refund) => sum + refund.totalAmount, 0)
 		)
 
-		const timeline = [
-			{
-				type: transaction.type,
-				at: transaction.createdAt,
-				amount: transaction.totalAmount,
-				actor: transaction.createdBy?.name ?? null,
-				transactionId: transaction.id
-			},
-			...transaction.payments.map(payment => ({
-				type: 'PAYMENT' as const,
-				at: payment.createdAt,
-				amount: payment.amount,
-				actor: payment.createdBy?.name ?? null,
-				transactionId: transaction.id
-			})),
-			...transaction.refunds.map(refund => ({
-				type: 'REFUND' as const,
-				at: refund.createdAt,
-				amount: refund.totalAmount,
-				actor: refund.createdBy?.name ?? null,
-				transactionId: refund.id
-			}))
-		].sort((a, b) => a.at.getTime() - b.at.getTime())
-
 		return {
 			...transaction,
 			items,
@@ -399,7 +265,7 @@ export class TransactionsService {
 				refundedAmount,
 				netAmount: round2(transaction.totalAmount - refundedAmount)
 			},
-			timeline
+			timeline: buildTransactionTimeline(transaction)
 		}
 	}
 

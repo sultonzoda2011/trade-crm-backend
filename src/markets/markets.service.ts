@@ -211,10 +211,7 @@ export class MarketsService {
 		const data: any = { ...dto }
 
 		if (file) {
-			if (existing.image) {
-				await this.storageService.delete(existing.image)
-			}
-			data.image = await this.storageService.save(file, 'markets')
+			data.image = await this.storageService.replace(existing.image, file, 'markets')
 		}
 
 		const updated = await this.prisma.$transaction(async tx => {
