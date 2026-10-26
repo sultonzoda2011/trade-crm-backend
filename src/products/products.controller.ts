@@ -1,13 +1,12 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common'
-import { FileInterceptor } from '@nestjs/platform-express'
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger'
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile } from '@nestjs/common'
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { Role } from '../enums'
 import { JwtPayload } from '../interfaces'
 import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe'
 import { ApiErrorResponse } from '../common/decorators/api-error-response.decorator'
-import { multerOptions } from '../common/utils/multipart.util'
+import { UploadImage } from '../common/decorators/upload-image.decorator'
 import { ProductsService } from './products.service'
 import { CreateProductDto } from './dto/create-product.dto'
 import { UpdateProductDto } from './dto/update-product.dto'
@@ -29,8 +28,8 @@ export class ProductsController {
 
   @Post()
   @Roles(Role.ADMIN, Role.OWNER)
+  @UploadImage()
   @ApiOperation({ summary: 'Create a product', description: 'Creates a new product with an optional image in the current user\'s market.' })
-  @ApiConsumes('multipart/form-data')
   @ApiBody({
     description: 'Product creation payload (multipart/form-data)',
     schema: {
@@ -46,7 +45,6 @@ export class ProductsController {
     },
   })
   @ApiCreatedResponse({ type: ProductResponseDto, description: 'The created product' })
-  @UseInterceptors(FileInterceptor('image', multerOptions))
   create(
     @Body() dto: CreateProductDto,
     @UploadedFile() file: Express.Multer.File,
@@ -86,9 +84,9 @@ export class ProductsController {
 
   @Patch(':id')
   @Roles(Role.ADMIN, Role.OWNER)
+  @UploadImage()
   @ApiOperation({ summary: 'Update a product', description: 'Updates a product with partial data and an optional new image.' })
   @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Product ID' })
-  @ApiConsumes('multipart/form-data')
   @ApiBody({
     description: 'Product update payload (multipart/form-data). Send a new image to replace the existing one, or omit to keep it.',
     schema: {
@@ -103,7 +101,6 @@ export class ProductsController {
     },
   })
   @ApiOkResponse({ type: ProductResponseDto, description: 'The updated product' })
-  @UseInterceptors(FileInterceptor('image', multerOptions))
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateProductDto,

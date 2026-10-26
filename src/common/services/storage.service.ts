@@ -67,4 +67,15 @@ export class StorageService {
     const publicId = extractPublicId(fileUrl)
     await cloudinary.uploader.destroy(publicId)
   }
+
+  /**
+   * Delete `oldUrl` if present, then upload `file` under `subfolder` and return the new URL.
+   * Centralizes the delete-then-save image replacement cycle repeated across 6 entity services.
+   */
+  async replace(oldUrl: string | null | undefined, file: Express.Multer.File, subfolder: string): Promise<string> {
+    if (oldUrl) {
+      await this.delete(oldUrl)
+    }
+    return this.save(file, subfolder)
+  }
 }

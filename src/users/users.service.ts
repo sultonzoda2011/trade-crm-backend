@@ -159,10 +159,7 @@ export class UsersService {
 		}
 
 		if (file) {
-			if (user.image) {
-				await this.storageService.delete(user.image)
-			}
-			data.image = await this.storageService.save(file, 'users')
+			data.image = await this.storageService.replace(user.image, file, 'users')
 		}
 
 		return this.prisma.user.update({

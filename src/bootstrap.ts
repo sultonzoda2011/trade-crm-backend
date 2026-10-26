@@ -68,22 +68,17 @@ export function configureApp(app: NestExpressApplication): void {
 	// Swagger доступен только в dev-окружении. В production документация API
 	// не отдаётся (отключить можно и через NODE_ENV=production локально).
 	if (nodeEnv !== 'production') {
+		const devOrigin = `http://localhost:${configService.get('PORT', 3000)}`
 		const swaggerConfig = new DocumentBuilder()
 			.setTitle('TradeCRM API')
 			.setDescription('CRM for managing markets')
 			.setVersion('1.0')
 			.setContact('TradeCRM Team', '', 'support@tradecrm.com')
-			.addServer(
-				nodeEnv === 'production'
-					? 'https://trade-crm-api.vercel.app'
-					: `http://localhost:${configService.get('PORT', 3000)}`,
-				nodeEnv === 'production' ? 'Production' : 'Development'
-			)
+			.addServer(devOrigin, 'Development')
 			.addBearerAuth(
 				{ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
 				'bearer'
 			)
-
 			.build()
 
 		const document = SwaggerModule.createDocument(app, swaggerConfig)
@@ -102,12 +97,6 @@ export function configureApp(app: NestExpressApplication): void {
 		app.getHttpAdapter().get('/api-json', (_, res: any) => {
 			res.json(document)
 		})
-		logger.log(
-			`Swagger docs: ${
-				nodeEnv === 'production'
-					? 'https://trade-crm-api.vercel.app'
-					: `http://localhost:${configService.get('PORT', 3000)}`
-			}/api/docs`
-		)
+		logger.log(`Swagger docs: ${devOrigin}/api/docs`)
 	}
 }

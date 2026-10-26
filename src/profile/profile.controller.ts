@@ -5,17 +5,15 @@ import {
 	HttpCode,
 	HttpStatus,
 	Patch,
-	UploadedFile,
-	UseInterceptors
+	UploadedFile
 } from '@nestjs/common'
-import { FileInterceptor } from '@nestjs/platform-express'
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger'
+import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 import { Express } from 'express'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { Role } from '../enums'
 import { ApiErrorResponse } from '../common/decorators/api-error-response.decorator'
-import { multerOptions } from '../common/utils/multipart.util'
+import { UploadImage } from '../common/decorators/upload-image.decorator'
 import { JwtPayload } from '../interfaces'
 import { ChangePasswordDto } from './dto/change-password.dto'
 import { ProfileResponseDto } from './dto/profile-response.dto'
@@ -43,7 +41,7 @@ export class ProfileController {
 	}
 
 	@Patch()
-	@ApiConsumes('multipart/form-data')
+	@UploadImage()
 	@ApiBody({
 		schema: {
 			type: 'object',
@@ -55,7 +53,6 @@ export class ProfileController {
 		},
 	})
 	@ApiOkResponse({ type: ProfileResponseDto })
-	@UseInterceptors(FileInterceptor('image', multerOptions))
 	updateProfile(
 		@Body() dto: UpdateProfileDto,
 		@UploadedFile() file?: Express.Multer.File,

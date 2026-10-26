@@ -1,13 +1,12 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common'
-import { FileInterceptor } from '@nestjs/platform-express'
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger'
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile } from '@nestjs/common'
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { Role } from '../enums'
 import { JwtPayload } from '../interfaces'
 import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe'
 import { ApiErrorResponse } from '../common/decorators/api-error-response.decorator'
-import { multerOptions } from '../common/utils/multipart.util'
+import { UploadImage } from '../common/decorators/upload-image.decorator'
 import { CategoriesService } from './categories.service'
 import { CreateCategoryDto } from './dto/create-category.dto'
 import { UpdateCategoryDto } from './dto/update-category.dto'
@@ -18,13 +17,13 @@ import { Express } from 'express'
 @ApiTags('Categories')
 @ApiBearerAuth()
 @ApiErrorResponse()
-@Roles(Role.ADMIN, Role.OWNER,Role.SELLER)
+@Roles(Role.ADMIN, Role.OWNER, Role.SELLER)
 @Controller('categories')
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Post()
-  @ApiConsumes('multipart/form-data')
+  @UploadImage()
   @ApiBody({
     schema: {
       type: 'object',
@@ -37,7 +36,6 @@ export class CategoriesController {
     },
   })
   @ApiCreatedResponse({ type: CategoryResponseDto, description: 'Category created' })
-  @UseInterceptors(FileInterceptor('image', multerOptions))
   create(
     @Body() dto: CreateCategoryDto,
     @UploadedFile() file?: Express.Multer.File,
@@ -72,7 +70,7 @@ export class CategoriesController {
   }
 
   @Patch(':id')
-  @ApiConsumes('multipart/form-data')
+  @UploadImage()
   @ApiBody({
     schema: {
       type: 'object',
@@ -84,7 +82,6 @@ export class CategoriesController {
     },
   })
   @ApiOkResponse({ type: CategoryResponseDto, description: 'Category updated' })
-  @UseInterceptors(FileInterceptor('image', multerOptions))
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateCategoryDto,

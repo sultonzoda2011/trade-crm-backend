@@ -85,14 +85,6 @@ export class RecentTransactionDto {
   createdBy?: DashboardUserDto
 }
 
-class TopDebtorMarketDto {
-  @ApiProperty()
-  id: string
-
-  @ApiProperty()
-  name: string
-}
-
 export class TopDebtorDto {
   @ApiProperty()
   id: string
@@ -103,8 +95,8 @@ export class TopDebtorDto {
   @ApiProperty()
   phone: string
 
-  @ApiPropertyOptional({ type: TopDebtorMarketDto })
-  market?: TopDebtorMarketDto
+  @ApiPropertyOptional({ type: DashboardMarketDto })
+  market?: DashboardMarketDto
 
   @ApiProperty()
   totalDebt: number

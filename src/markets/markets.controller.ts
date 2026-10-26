@@ -1,12 +1,11 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common'
-import { FileInterceptor } from '@nestjs/platform-express'
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger'
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile } from '@nestjs/common'
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { ApiErrorResponse } from '../common/decorators/api-error-response.decorator'
+import { UploadImage } from '../common/decorators/upload-image.decorator'
 import { PaginatedResult } from '../common/dto/pagination.dto'
 import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe'
-import { multerOptions } from '../common/utils/multipart.util'
 import { Role } from '../enums'
 import { JwtPayload } from '../interfaces'
 import { CreateMarketDto } from './dto/create-market.dto'
@@ -27,8 +26,8 @@ export class MarketsController {
 
   @Post()
   @Roles(Role.ADMIN)
+  @UploadImage()
   @ApiOperation({ summary: 'Create a market', description: 'Creates a new market with an optional image. Admin only.' })
-  @ApiConsumes('multipart/form-data')
   @ApiBody({
     description: 'Market creation payload (multipart/form-data)',
     schema: {
@@ -43,7 +42,6 @@ export class MarketsController {
     },
   })
   @ApiCreatedResponse({ type: MarketResponseDto, description: 'The created market' })
-  @UseInterceptors(FileInterceptor('image', multerOptions))
   create(
     @Body() dto: CreateMarketDto,
     @UploadedFile() file: Express.Multer.File,
@@ -83,12 +81,11 @@ export class MarketsController {
     return this.marketsService.findOneFull(id, user)
   }
 
-
   @Patch(':id')
   @Roles(Role.ADMIN, Role.OWNER)
+  @UploadImage()
   @ApiOperation({ summary: 'Update a market', description: 'Updates a market with partial data and an optional new image. Admin or the owner of the market.' })
   @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Market ID' })
-  @ApiConsumes('multipart/form-data')
   @ApiBody({
     description: 'Market update payload (multipart/form-data). Send a new image to replace the existing one, or omit to keep it.',
     schema: {
@@ -102,7 +99,6 @@ export class MarketsController {
     },
   })
   @ApiOkResponse({ type: MarketResponseDto, description: 'The updated market' })
-  @UseInterceptors(FileInterceptor('image', multerOptions))
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateMarketDto,
