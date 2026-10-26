@@ -493,21 +493,24 @@ export class DebtorsService {
       ]
     }
     if (query.dateFrom || query.dateTo) where.createdAt = buildDateWhere(query.dateFrom, query.dateTo)
+    // Каждое условие по долгам — отдельный элемент AND. Раньше все они писались в
+    // одно поле `transactions`, и последнее молча затирало предыдущее (а «Просрочен = Нет»
+    // не применялся вовсе). Теперь «Нет активных долгов» + «Просрочен» честно даёт пустую
+    // выборку, а «Просрочен = Нет» исключает должников с просроченным долгом.
+    const debtConditions: Prisma.DebtorWhereInput[] = []
     if (query.hasActiveDebts != null) {
-      where.transactions = query.hasActiveDebts
-        ? { some: { type: 'DEBT', status: { in: ACTIVE_DEBT_STATUSES } } }
-        : { none: { type: 'DEBT', status: { in: ACTIVE_DEBT_STATUSES } } }
+      const active = { type: 'DEBT' as const, status: { in: ACTIVE_DEBT_STATUSES } }
+      debtConditions.push({ transactions: query.hasActiveDebts ? { some: active } : { none: active } })
     }
-    if (query.overdue != null && query.overdue === true) {
-      where.transactions = {
-        ...(where.transactions ?? {}),
-        some: {
-          type: 'DEBT',
-          status: { in: ACTIVE_DEBT_STATUSES },
-          dueDate: { lt: new Date() },
-        },
+    if (query.overdue != null) {
+      const overdue = {
+        type: 'DEBT' as const,
+        status: { in: ACTIVE_DEBT_STATUSES },
+        dueDate: { lt: new Date() },
       }
+      debtConditions.push({ transactions: query.overdue ? { some: overdue } : { none: overdue } })
     }
+    if (debtConditions.length > 0) where.AND = debtConditions
     if (query.minDebtAmount != null || query.maxDebtAmount != null) {
       const having: Prisma.TransactionGroupByArgs['having'] = {
         remainingAmount: {

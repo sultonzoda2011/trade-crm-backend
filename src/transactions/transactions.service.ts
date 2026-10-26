@@ -295,23 +295,30 @@ export class TransactionsService {
 		debtStatus: DebtStatusFilter,
 		now: Date = new Date()
 	): void {
-		where.type = 'DEBT'
+		// Условия кладём в AND, а не в where.type / where.status: иначе фильтр затирал бы
+		// явно выбранные «Тип» и «Статус» (тип «Продажа» + «Просрочен» отдавал бы долги).
+		// Несовместимые выборы — «Продажа» + любое состояние долга, «Активна» + «Закрыт» —
+		// теперь дают пустой список, а не чужие строки.
+		const conditions: Prisma.TransactionWhereInput[] = [{ type: 'DEBT' }]
 
 		if (debtStatus === DebtStatusFilter.SETTLED) {
-			where.status = 'PAID'
-			return
-		}
+			conditions.push({ status: 'PAID' })
+		} else {
+			conditions.push({ status: { in: ['ACTIVE', 'PARTIAL'] } })
 
-		where.status = { in: ['ACTIVE', 'PARTIAL'] }
-
-		if (debtStatus === DebtStatusFilter.OVERDUE) {
-			where.dueDate = { lt: now }
-		} else if (debtStatus === DebtStatusFilter.DUE_SOON) {
-			where.dueDate = {
-				gte: now,
-				lte: new Date(now.getTime() + DUE_SOON_DAYS * MS_PER_DAY)
+			if (debtStatus === DebtStatusFilter.OVERDUE) {
+				conditions.push({ dueDate: { lt: now } })
+			} else if (debtStatus === DebtStatusFilter.DUE_SOON) {
+				conditions.push({
+					dueDate: {
+						gte: now,
+						lte: new Date(now.getTime() + DUE_SOON_DAYS * MS_PER_DAY)
+					}
+				})
 			}
 		}
+
+		where.AND = conditions
 	}
 
 	async findOne(id: string, userMarketId?: string) {

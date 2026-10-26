@@ -1,5 +1,5 @@
 import { IsBoolean, IsEnum, IsOptional, IsUUID } from 'class-validator'
-import { Type } from 'class-transformer'
+import { QueryBoolean } from '../../common/decorators/query-boolean.decorator'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { BaseQueryDto } from '../../common/dto/base-query.dto'
 import { Role } from '../../enums'
@@ -17,7 +17,7 @@ export class QueryUserDto extends BaseQueryDto {
 
   @ApiPropertyOptional({ description: 'Only users who own at least one market' })
   @IsOptional()
-  @Type(() => Boolean)
+  @QueryBoolean()
   @IsBoolean()
   isOwner?: boolean
 }

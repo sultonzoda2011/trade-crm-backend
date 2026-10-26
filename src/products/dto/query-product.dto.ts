@@ -1,4 +1,5 @@
 import { IsBoolean, IsEnum, IsNumber, IsOptional, IsUUID, Min } from 'class-validator'
+import { QueryBoolean } from '../../common/decorators/query-boolean.decorator'
 import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { BaseQueryDto } from '../../common/dto/base-query.dto'
@@ -13,7 +14,7 @@ export class QueryProductDto extends BaseQueryDto {
 
   @ApiPropertyOptional({ description: 'Return only products at or below their low-stock threshold' })
   @IsOptional()
-  @Type(() => Boolean)
+  @QueryBoolean()
   @IsBoolean()
   lowStock?: boolean
 
@@ -62,7 +63,7 @@ export class QueryProductDto extends BaseQueryDto {
     description: 'Return only products that need reordering, sorted by urgency',
   })
   @IsOptional()
-  @Type(() => Boolean)
+  @QueryBoolean()
   @IsBoolean()
   needsReorder?: boolean
 }

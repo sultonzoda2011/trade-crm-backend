@@ -164,6 +164,10 @@ export class ProductsService {
 		if (query.search) {
 			where.name = { contains: query.search, mode: 'insensitive' }
 		}
+		// Дата создания и цена фильтруются так же, как на обычном пути: иначе выбор
+		// «Состояние» или «Срочность» молча сбрасывал бы эти фильтры.
+		if (query.dateFrom || query.dateTo)
+			where.createdAt = buildDateWhere(query.dateFrom, query.dateTo)
 		if (query.priceMin != null || query.priceMax != null) {
 			where.price = {}
 			if (query.priceMin != null) where.price.gte = query.priceMin
@@ -190,6 +194,10 @@ export class ProductsService {
 			)
 		}))
 
+		if (query.lowStock) {
+			// Тот же критерий, что у SQL-пути: остаток не выше порога.
+			rows = rows.filter(row => row.quantity <= row.lowStockThreshold)
+		}
 		if (query.health) {
 			rows = rows.filter(row => row.metrics.health === query.health)
 		}
