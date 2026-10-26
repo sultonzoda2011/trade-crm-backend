@@ -1,5 +1,4 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
+import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { compare } from 'bcrypt'
 import { JwtPayload } from '../interfaces'
@@ -8,12 +7,9 @@ import { AuthResponseDto } from './dto/auth-response.dto'
 
 @Injectable()
 export class AuthService {
-	private readonly logger = new Logger(AuthService.name)
-
 	constructor(
 		private readonly prisma: PrismaService,
-		private readonly jwtService: JwtService,
-		private readonly configService: ConfigService
+		private readonly jwtService: JwtService
 	) {}
 
 	async login(email: string, password: string): Promise<AuthResponseDto> {
@@ -28,21 +24,14 @@ export class AuthService {
 			throw new UnauthorizedException('Invalid email or password')
 		}
 
-		const result = await this.generateTokens(
-			user.id,
-			user.email,
-			user.role as any,
-			{
-				id: user.id,
-				name: user.name,
-				email: user.email,
-				role: user.role,
-				image: user.image ?? undefined,
-				marketId: user.marketId ?? undefined
-			}
-		)
-
-		return result
+		return this.generateTokens(user.id, user.email, user.role as any, {
+			id: user.id,
+			name: user.name,
+			email: user.email,
+			role: user.role,
+			image: user.image ?? undefined,
+			marketId: user.marketId ?? undefined
+		})
 	}
 
 	private async generateTokens(
@@ -67,9 +56,7 @@ export class AuthService {
 			id: user.id
 		}
 
-		const [accessToken] = await Promise.all([
-			this.jwtService.signAsync(payload)
-		])
+		const accessToken = await this.jwtService.signAsync(payload)
 
 		return {
 			accessToken,

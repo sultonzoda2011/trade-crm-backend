@@ -1,11 +1,10 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common'
-import { FileInterceptor } from '@nestjs/platform-express'
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger'
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile } from '@nestjs/common'
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger'
 import { Role } from '../enums'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe'
 import { ApiErrorResponse } from '../common/decorators/api-error-response.decorator'
-import { multerOptions } from '../common/utils/multipart.util'
+import { UploadImage } from '../common/decorators/upload-image.decorator'
 import { UsersService } from './users.service'
 import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
@@ -23,7 +22,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  @ApiConsumes('multipart/form-data')
+  @UploadImage()
   @ApiBody({
     schema: {
       type: 'object',
@@ -38,7 +37,6 @@ export class UsersController {
     },
   })
   @ApiCreatedResponse({ type: UserResponseDto })
-  @UseInterceptors(FileInterceptor('image', multerOptions))
   create(@Body() dto: CreateUserDto, @UploadedFile() file?: Express.Multer.File) {
     return this.usersService.create(dto, file)
   }
@@ -66,7 +64,7 @@ export class UsersController {
   }
 
   @Patch(':id')
-  @ApiConsumes('multipart/form-data')
+  @UploadImage()
   @ApiBody({
     schema: {
       type: 'object',
@@ -80,7 +78,6 @@ export class UsersController {
     },
   })
   @ApiOkResponse({ type: UserResponseDto })
-  @UseInterceptors(FileInterceptor('image', multerOptions))
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateUserDto, @UploadedFile() file?: Express.Multer.File) {
     return this.usersService.update(id, dto, file)
   }

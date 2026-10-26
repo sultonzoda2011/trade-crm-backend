@@ -32,7 +32,7 @@ describe('UsersService (last admin protection)', () => {
 			delete: jest.fn()
 		}
 		configService = { get: jest.fn().mockReturnValue(12) }
-		service = new UsersService(prisma, storageService, configService)
+		service = new UsersService(prisma, storageService, configService, {} as any, {} as any)
 	})
 
 	describe('remove', () => {

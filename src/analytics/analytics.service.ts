@@ -16,6 +16,33 @@ export enum ReorderPriority {
   NOT_NEEDED = 'NOT_NEEDED',
 }
 
+/** Порядок срочности закупки для сортировки выдачи. */
+export const REORDER_PRIORITY_ORDER: Record<ReorderPriority, number> = {
+  [ReorderPriority.OUT_OF_STOCK]: 0,
+  [ReorderPriority.CRITICAL]: 1,
+  [ReorderPriority.WARNING]: 2,
+  [ReorderPriority.OK]: 3,
+  [ReorderPriority.NOT_NEEDED]: 4,
+}
+
+/**
+ * Сортирует две метрики товара по срочности закупки, а внутри одной срочности —
+ * по возрастанию запаса в днях (сначала те, что кончатся раньше).
+ */
+export function compareReorderUrgency(
+  a: Pick<ProductMetrics, 'reorderPriority' | 'daysOfStockRemaining'>,
+  b: Pick<ProductMetrics, 'reorderPriority' | 'daysOfStockRemaining'>,
+): number {
+  const diff =
+    REORDER_PRIORITY_ORDER[a.reorderPriority] -
+    REORDER_PRIORITY_ORDER[b.reorderPriority]
+  if (diff !== 0) return diff
+  return (
+    (a.daysOfStockRemaining ?? Number.POSITIVE_INFINITY) -
+    (b.daysOfStockRemaining ?? Number.POSITIVE_INFINITY)
+  )
+}
+
 /** Состояние товара с точки зрения бизнеса, а не только остатка. */
 export enum ProductHealth {
   OUT_OF_STOCK = 'OUT_OF_STOCK',
