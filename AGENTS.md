@@ -146,6 +146,13 @@ Helpers in `src/common/utils/paginate.util.ts`:
 - `buildOrderBy(sortBy, sortOrder, defaultSortBy = 'createdAt', allowedSortBy?)` — **always pass the allow-list**. Unknown keys silently fall back to the default, which blocks column enumeration.
 - `buildDateWhere(dateFrom, dateTo)` → `{ gte?, lte? }`.
 
+Rules for query filters (the frontend chips and filter sheet depend on them):
+
+- **Boolean query params use `@QueryBoolean()`** (`src/common/decorators/query-boolean.decorator.ts`) + `@IsBoolean()`, **never `@Type(() => Boolean)`**: `Boolean('false')` is `true`, so `?hasActiveDebts=false` silently meant "true". Garbage values get a 400.
+- **Independent filters must not overwrite each other.** Compose several conditions on one relation or field through `where.AND` (see `applyDebtStatusFilter` in `transactions.helpers.ts` and the `hasActiveDebts` / `overdue` conditions in `debtors.service.ts`). An impossible combination returns an empty page, never rows that violate a selected filter.
+- **Both query paths of a list must honour the same filters.** `products.service.ts` has a DB path and an analytics path (`health`, `reorderPriority`, `needsReorder`); a filter added to one has to be added to the other.
+- Which filter combinations can never co-occur is mirrored on the frontend in `app/config/filterRules.ts`; change the backend logic and that file together.
+
 ## Rate limiting
 
 - Global `ThrottlerGuard` registered via `APP_GUARD` in `app.module.ts`. Default limit **100 req / 60 s per IP**.
