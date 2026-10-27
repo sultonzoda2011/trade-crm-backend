@@ -87,6 +87,14 @@ model Debtor {
   marketId     String
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  // Заметка для себя: «ряд 5, лавка 12», «звонить после обеда».
+  note         String?
+  // Мягкий лимит долга: при превышении фронт предупреждает, но не блокирует.
+  creditLimit  Float?
+  // Срок возврата по умолчанию (дни) — подставляется в «Дать долг».
+  defaultDueDays Int?
+  // Когда последний раз напоминали о долге (WhatsApp/SMS/звонок).
+  lastRemindedAt DateTime?
   market       Market        @relation(fields: [marketId], references: [id])
   transactions Transaction[]
 
