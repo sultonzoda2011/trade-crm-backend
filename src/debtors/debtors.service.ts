@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { PaginatedResult } from '../common/dto/pagination.dto'
 import { buildDateWhere, buildOrderBy, paginate } from '../common/utils/paginate.util'
 import { MS_PER_DAY, round2 } from '../common/utils/period.util'
+import { JwtPayload } from '../interfaces'
 import { TransactionStatus } from '../enums'
 import { PrismaService } from '../prisma/prisma.service'
 import { QueryTransactionDto } from '../transactions/dto/query-transaction.dto'
@@ -18,7 +19,11 @@ import {
   RISK_SORT_FIELDS,
   scoreDebtorRisk,
 } from './debtor-risk.util'
+import { buildDebtorLedger } from './debtor-ledger.util'
+import { planDebtorPayment } from './debtor-payment.util'
+import { isValidPhone, normalizePhone } from './debtor-phone.util'
 import { CreateDebtorDto } from './dto/create-debtor.dto'
+import { CreateDebtorPaymentDto } from './dto/create-debtor-payment.dto'
 import { QueryDebtorDto } from './dto/query-debtor.dto'
 import { UpdateDebtorDto } from './dto/update-debtor.dto'
 
@@ -29,6 +34,15 @@ const DEBTOR_TRANSACTIONS_PREVIEW_LIMIT = 5
 
 /** Сколько товаров последней покупки показывать превью-миниатюрами на карточке. */
 const LAST_PURCHASE_ITEMS_LIMIT = 3
+
+/** Потолок ленты: сколько последних долговых транзакций должника учитываем. */
+const LEDGER_TRANSACTIONS_LIMIT = 1000
+
+/** После напоминания человек не попадает в «позвонить сегодня» столько дней. */
+const REMIND_COOLDOWN_DAYS = 2
+
+/** Сколько должников показывать в блоке «позвонить сегодня». */
+const CALL_TODAY_LIMIT = 5
 
 const ACTIVE_DEBT_STATUSES: TransactionStatus[] = [TransactionStatus.ACTIVE, TransactionStatus.PARTIAL]
 
@@ -57,10 +71,12 @@ export class DebtorsService {
    * транзакции.
    */
   private async getDebtProfiles(
-    debtorIds: string[],
+    debtors: Array<{ id: string; marketId: string }>,
     now: Date,
   ): Promise<Map<string, DebtorDebtProfile>> {
-    if (debtorIds.length === 0) return new Map()
+    if (debtors.length === 0) return new Map()
+    const debtorIds = debtors.map(d => d.id)
+    const marketOf = new Map(debtors.map(d => [d.id, d.marketId]))
 
     const rows = await this.prisma.$queryRaw<
       Array<{
@@ -136,12 +152,10 @@ export class DebtorsService {
     const payments = new Map(paymentRows.map(row => [row.debtorId, row]))
     const lastPurchases = await this.getLastPurchases(debtorIds)
 
-    // База сравнения размера долга — средний активный долг по этой выборке.
-    const withDebt = rows.filter(row => Number(row.totalDebtAmount) > 0)
-    const marketAverageDebt =
-      withDebt.length > 0
-        ? withDebt.reduce((sum, row) => sum + Number(row.totalDebtAmount), 0) / withDebt.length
-        : 0
+    // База сравнения размера долга — средний активный долг по ВСЕМУ маркету,
+    // а не по текущей странице: иначе риск одного человека менялся бы от
+    // фильтра, страницы и сортировки списка.
+    const marketAverages = await this.getMarketAverageDebts([...new Set(marketOf.values())])
 
     const profiles = new Map<string, DebtorDebtProfile>()
 
@@ -167,7 +181,7 @@ export class DebtorsService {
         totalIssued,
         totalCollected,
         daysSinceLastPayment,
-        marketAverageDebt,
+        marketAverageDebt: marketAverages.get(marketOf.get(row.debtorId) ?? '') ?? 0,
       })
 
       profiles.set(row.debtorId, {
@@ -189,6 +203,27 @@ export class DebtorsService {
     }
 
     return profiles
+  }
+
+  /** Средний активный долг на должника — по каждому маркету одним запросом. */
+  private async getMarketAverageDebts(marketIds: string[]): Promise<Map<string, number>> {
+    if (marketIds.length === 0) return new Map()
+
+    const rows = await this.prisma.$queryRaw<Array<{ marketId: string; average: number }>>`
+			SELECT d."marketId" AS "marketId", AVG(x."debt")::float AS "average"
+			FROM (
+				SELECT t."debtorId" AS "debtorId", SUM(t."remainingAmount") AS "debt"
+				FROM "Transaction" t
+				WHERE t."type" = 'DEBT' AND t."status" IN ('ACTIVE', 'PARTIAL')
+				GROUP BY t."debtorId"
+				HAVING SUM(t."remainingAmount") > 0
+			) x
+			INNER JOIN "Debtor" d ON d."id" = x."debtorId"
+			WHERE d."marketId" IN (${Prisma.join(marketIds)})
+			GROUP BY d."marketId"
+		`
+
+    return new Map(rows.map(row => [row.marketId, Number(row.average)]))
   }
 
   /**
@@ -251,7 +286,32 @@ export class DebtorsService {
 
   async create(dto: CreateDebtorDto, marketId?: string) {
     if (!marketId) throw new UnauthorizedException('User is not assigned to a market')
-    return this.prisma.debtor.create({ data: { ...dto, marketId }, include: debtorInclude })
+
+    const phone = this.cleanPhone(dto.phone)
+    const duplicate = await this.findPhoneDuplicate(phone, marketId)
+    const debtor = await this.prisma.debtor.create({
+      data: { ...dto, phone, marketId },
+      include: debtorInclude,
+    })
+
+    // Дубль номера не блокируем: на рынке один телефон бывает у двух людей
+    // (семейная лавка). Просто говорим клиенту, чтобы он спросил продавца.
+    return { ...debtor, phoneDuplicateOf: duplicate }
+  }
+
+  private cleanPhone(raw: string): string {
+    const phone = normalizePhone(raw)
+    if (!isValidPhone(phone)) {
+      throw new BadRequestException('Phone must contain 7-15 digits, optionally starting with +')
+    }
+    return phone
+  }
+
+  private findPhoneDuplicate(phone: string, marketId: string, excludeId?: string) {
+    return this.prisma.debtor.findFirst({
+      where: { marketId, phone, ...(excludeId ? { id: { not: excludeId } } : {}) },
+      select: { id: true, name: true },
+    })
   }
 
   async findAll(query: QueryDebtorDto, userMarketId?: string): Promise<PaginatedResult<unknown>> {
@@ -334,7 +394,7 @@ export class DebtorsService {
     // Профиль долгов и риск считаются для страницы, а не для всей таблицы:
     // один агрегат на выдачу вместо запроса на каждого должника.
     const now = new Date()
-    const profiles = await this.getDebtProfiles(result.data.map(d => d.id), now)
+    const profiles = await this.getDebtProfiles(result.data, now)
 
     return {
       ...result,
@@ -365,7 +425,7 @@ export class DebtorsService {
     })
 
     const now = new Date()
-    const profiles = await this.getDebtProfiles(debtors.map(d => d.id), now)
+    const profiles = await this.getDebtProfiles(debtors, now)
 
     let rows = debtors.map(debtor => ({
       ...debtor,
@@ -396,7 +456,7 @@ export class DebtorsService {
       throw new NotFoundException('Debtor not found')
     }
 
-    const profiles = await this.getDebtProfiles([id], new Date())
+    const profiles = await this.getDebtProfiles([debtor], new Date())
     return { ...debtor, ...(profiles.get(id) ?? EMPTY_DEBTOR_PROFILE) }
   }
 
@@ -427,12 +487,201 @@ export class DebtorsService {
   }
 
   async update(id: string, dto: UpdateDebtorDto, userMarketId?: string) {
-    await this.getDebtorOrThrow(id, userMarketId)
-    return this.prisma.debtor.update({ where: { id }, data: dto, include: debtorInclude })
+    const current = await this.getDebtorOrThrow(id, userMarketId)
+    const phone = dto.phone != null ? this.cleanPhone(dto.phone) : undefined
+    const duplicate = phone ? await this.findPhoneDuplicate(phone, current.marketId, id) : null
+    const debtor = await this.prisma.debtor.update({
+      where: { id },
+      data: { ...dto, ...(phone ? { phone } : {}) },
+      include: debtorInclude,
+    })
+    return { ...debtor, phoneDuplicateOf: duplicate }
   }
 
   async remove(id: string, userMarketId?: string) {
     await this.getDebtorOrThrow(id, userMarketId)
     await this.prisma.debtor.delete({ where: { id } })
+  }
+
+  /**
+   * Лента выдач и оплат с остатком после каждого события (новые сверху).
+   * События двух таблиц склеиваются в памяти: у одного должника их десятки-
+   * сотни, а остаток «после» нельзя посчитать постраничным SQL.
+   */
+  async getLedger(id: string, query: { page?: number; limit?: number }, userMarketId?: string) {
+    await this.getDebtorOrThrow(id, userMarketId)
+
+    const debts = await this.prisma.transaction.findMany({
+      where: { debtorId: id, type: 'DEBT' },
+      orderBy: { createdAt: 'desc' },
+      take: LEDGER_TRANSACTIONS_LIMIT,
+      select: {
+        id: true,
+        totalAmount: true,
+        createdAt: true,
+        dueDate: true,
+        createdBy: { select: { name: true } },
+        items: { select: { productName: true }, take: LAST_PURCHASE_ITEMS_LIMIT },
+        payments: {
+          select: {
+            id: true,
+            transactionId: true,
+            amount: true,
+            note: true,
+            createdAt: true,
+            createdBy: { select: { name: true } },
+          },
+        },
+      },
+    })
+
+    const events = buildDebtorLedger(
+      debts.map(debt => ({
+        id: debt.id,
+        totalAmount: debt.totalAmount,
+        createdAt: debt.createdAt,
+        dueDate: debt.dueDate,
+        createdByName: debt.createdBy?.name ?? null,
+        itemNames: debt.items.map(item => item.productName),
+      })),
+      debts.flatMap(debt =>
+        debt.payments.map(payment => ({
+          id: payment.id,
+          transactionId: payment.transactionId,
+          amount: payment.amount,
+          note: payment.note,
+          createdAt: payment.createdAt,
+          createdByName: payment.createdBy?.name ?? null,
+        })),
+      ),
+    )
+
+    const page = query.page ?? 1
+    const limit = Math.min(query.limit ?? 30, 100)
+    const total = events.length
+
+    return {
+      data: events.slice((page - 1) * limit, page * limit),
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    }
+  }
+
+  /**
+   * Платёж «человек принёс сумму»: раскладывается по открытым долгам от
+   * старых к новым (FIFO). Всё в одной транзакции БД — либо списались все
+   * долги и записались все платежи, либо ничего.
+   */
+  async payDebtor(id: string, dto: CreateDebtorPaymentDto, user: JwtPayload) {
+    if (!user.marketId) throw new UnauthorizedException('User is not assigned to a market')
+    await this.getDebtorOrThrow(id, user.marketId)
+
+    return this.prisma.$transaction(async tx => {
+      const debts = await tx.transaction.findMany({
+        where: { debtorId: id, type: 'DEBT', status: { in: ACTIVE_DEBT_STATUSES }, remainingAmount: { gt: 0 } },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, remainingAmount: true },
+      })
+
+      if (debts.length === 0) throw new BadRequestException('Debtor has no active debts')
+
+      const plan = planDebtorPayment(debts, dto.amount)
+      if (plan.excess > 0) {
+        const total = round2(debts.reduce((sum, debt) => sum + debt.remainingAmount, 0))
+        throw new BadRequestException(`Payment amount (${dto.amount}) exceeds total debt (${total})`)
+      }
+
+      const before = new Map(debts.map(debt => [debt.id, debt.remainingAmount]))
+      for (const part of plan.allocations) {
+        // Та же защита от lost update, что и в TransactionsService.pay():
+        // пишем, только если остаток не изменился с момента чтения.
+        const updated = await tx.transaction.updateMany({
+          where: { id: part.transactionId, remainingAmount: before.get(part.transactionId) },
+          data: {
+            remainingAmount: part.remainingAfter,
+            status: part.settled ? TransactionStatus.PAID : TransactionStatus.PARTIAL,
+          },
+        })
+        if (updated.count === 0) {
+          throw new BadRequestException('Debt was modified concurrently, please retry')
+        }
+
+        await tx.payment.create({
+          data: {
+            transactionId: part.transactionId,
+            amount: part.amount,
+            note: dto.note,
+            createdById: user.sub,
+          },
+        })
+      }
+
+      const remainingDebt = round2(
+        debts.reduce((sum, debt) => sum + debt.remainingAmount, 0) - dto.amount,
+      )
+
+      return {
+        totalApplied: round2(dto.amount),
+        remainingDebt,
+        allocations: plan.allocations,
+      }
+    })
+  }
+
+  /** Отметка «напомнили о долге» — после звонка/WhatsApp/SMS. */
+  async markReminded(id: string, userMarketId?: string) {
+    await this.getDebtorOrThrow(id, userMarketId)
+    const debtor = await this.prisma.debtor.update({
+      where: { id },
+      data: { lastRemindedAt: new Date() },
+      select: { id: true, lastRemindedAt: true },
+    })
+    return debtor
+  }
+
+  /**
+   * Сводка над списком: сколько должны всего, сколько просрочено и с кем
+   * разбираться сегодня. Считается по всем должникам маркета, а не по
+   * странице — иначе цифры «прыгали» бы при листании.
+   */
+  async getSummary(userMarketId?: string) {
+    const debtors = await this.prisma.debtor.findMany({
+      where: {
+        ...(userMarketId ? { marketId: userMarketId } : {}),
+        transactions: { some: { type: 'DEBT', status: { in: ACTIVE_DEBT_STATUSES } } },
+      },
+      select: { id: true, name: true, phone: true, marketId: true, lastRemindedAt: true },
+      take: RISK_PATH_LIMIT,
+    })
+
+    const now = new Date()
+    const profiles = await this.getDebtProfiles(debtors, now)
+    const rows = debtors.map(debtor => ({
+      ...debtor,
+      ...(profiles.get(debtor.id) ?? EMPTY_DEBTOR_PROFILE),
+    }))
+
+    const remindedRecently = (at: Date | null) => at != null && now.getTime() - at.getTime() < REMIND_COOLDOWN_DAYS * MS_PER_DAY
+
+    const callToday = rows
+      .filter(row => row.overdueAmount > 0 && !remindedRecently(row.lastRemindedAt))
+      .sort(buildRiskComparator('risk'))
+      .slice(0, CALL_TODAY_LIMIT)
+      .map(row => ({
+        id: row.id,
+        name: row.name,
+        phone: row.phone,
+        overdueAmount: row.overdueAmount,
+        maxDaysOverdue: row.maxDaysOverdue,
+        risk: row.risk,
+      }))
+
+    return {
+      totalDebt: round2(rows.reduce((sum, row) => sum + row.totalDebtAmount, 0)),
+      overdueAmount: round2(rows.reduce((sum, row) => sum + row.overdueAmount, 0)),
+      debtorsWithDebt: rows.length,
+      overdueDebtors: rows.filter(row => row.overdueAmount > 0).length,
+      highRiskDebtors: rows.filter(row => row.risk === 'HIGH').length,
+      callToday,
+    }
   }
 }

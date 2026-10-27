@@ -8,6 +8,7 @@ import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe'
 import { ApiErrorResponse } from '../common/decorators/api-error-response.decorator'
 import { DebtorsService } from './debtors.service'
 import { CreateDebtorDto } from './dto/create-debtor.dto'
+import { CreateDebtorPaymentDto } from './dto/create-debtor-payment.dto'
 import { UpdateDebtorDto } from './dto/update-debtor.dto'
 import { QueryDebtorDto } from './dto/query-debtor.dto'
 import { DebtorResponseDto } from './dto/debtor-response.dto'
@@ -55,6 +56,13 @@ export class DebtorsController {
     return this.debtorsService.findAll(query, user.marketId)
   }
 
+  // Должен стоять выше ':id': иначе "summary" уйдёт в ParseUUIDPipe и вернёт 400.
+  @Get('summary')
+  @ApiOperation({ summary: 'Totals above the debtors list and who to call today' })
+  getSummary(@CurrentUser() user: JwtPayload) {
+    return this.debtorsService.getSummary(user.marketId)
+  }
+
   @Get(':id')
   @ApiOkResponse({ type: DebtorResponseDto })
   findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
@@ -65,6 +73,44 @@ export class DebtorsController {
   @ApiOperation({ summary: 'Debtor detail page in one round-trip: debtor + recent transactions preview' })
   findOneFull(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
     return this.debtorsService.findOneFull(id, user.marketId)
+  }
+
+  @Get(':id/ledger')
+  @ApiOperation({ summary: 'Debts and payments of one debtor with the running balance, newest first' })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 30 })
+  getLedger(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('page') page: string | undefined,
+    @Query('limit') limit: string | undefined,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.debtorsService.getLedger(
+      id,
+      { page: page ? Math.max(parseInt(page, 10) || 1, 1) : undefined, limit: limit ? Math.max(parseInt(limit, 10) || 30, 1) : undefined },
+      user.marketId,
+    )
+  }
+
+  @Post(':id/payments')
+  @UseInterceptors(IdempotencyInterceptor)
+  @ApiHeader({ name: 'Idempotency-Key', required: false, description: 'Client-generated uuid to dedupe retried requests' })
+  @ApiOperation({
+    summary: 'Accept a payment from a debtor',
+    description: 'The amount is applied to the oldest active debts first. All-or-nothing.',
+  })
+  payDebtor(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateDebtorPaymentDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.debtorsService.payDebtor(id, dto, user)
+  }
+
+  @Post(':id/remind')
+  @ApiOperation({ summary: 'Mark that the debtor was reminded about the debt (call/WhatsApp/SMS)' })
+  markReminded(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+    return this.debtorsService.markReminded(id, user.marketId)
   }
 
   @Patch(':id')
