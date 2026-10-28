@@ -207,12 +207,11 @@ Token internals (`auth.service.ts` / `src/interfaces/jwt-payload.interface.ts`):
 
 ## Seed
 
-- Run `npm run prisma:seed` after migrate.
-- Admin: `admin@tradecrm.com` / `12345678Aa`
-- Clears all tables before seeding (delete order respects FK constraints).
-- Creates 2 markets, each with owner + 2 sellers, random products/debtors/transactions.
-- Uploads images from `prisma/png/` to Cloudinary with an in-memory cache. bcrypt rounds are hardcoded to `10` here.
-- Named seed users: `alisher@`, `bakhtiyar@`, `madina@` (market 1); `dilnoza@`, `jasur@`, `nigora@` (market 2). All use password `12345678Aa`.
+- Run `npm run prisma:seed` against an empty/migrated DB. It **wipes all tables** first (incl. `IdempotencyKey`, `ThrottleBucket`).
+- Deterministic (no `Math.random`), relative to "now": 2 markets × (owner + sellers, 5 categories, 25 products, 7 debtors, 45 sales, 18 debts, 9 refunds). Re-seed right before testing the 10-minute seller-cancel rule — the "fresh" debt is created 3 minutes before the seed ran.
+- Coverage is intentional, so no screen/query is empty: debtor scenarios (reliable / overdue + over credit limit / due soon / advance / settled / no due date / new), debts with advance, partial and full payments, notes, refund reasons, partial + repeated refunds, markup + seller payouts, low/zero/dead stock, products without `costPrice`, sales today/yesterday/last year (for period comparisons), varied hours (heatmap).
+- Logins (password `12345678Aa` for all): `admin@tradecrm.com` (ADMIN); `alisher@tradecrm.com`, `dilnoza@tradecrm.com` (OWNER); sellers `sultonzoda2011@gmail.com`, `bakhtiyar@`, `madina@` (market 1, @tradecrm.com except the first) and `jasur@`, `nigora@` (market 2).
+- No images are uploaded (all `image` fields are null).
 
 ## .env required vars
 

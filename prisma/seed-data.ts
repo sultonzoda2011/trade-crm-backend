@@ -12,6 +12,7 @@ export const MARKET_1_SPEC: MarketSeedSpec = {
 	address: 'ул. Ленина, 15, г. Ташкент',
 	owner: { name: 'Алишер Каримов', email: 'alisher@tradecrm.com' },
 	sellers: [
+		{ name: 'Султонзода', email: 'sultonzoda2011@gmail.com' },
 		{ name: 'Бахтияр Рахимов', email: 'bakhtiyar@tradecrm.com' },
 		{ name: 'Мадина Юсупова', email: 'madina@tradecrm.com' }
 	]
@@ -128,18 +129,39 @@ export const MARKET_2_PRODUCTS = [
 	{ name: 'Томатная паста', description: '250г', price: 7000, unit: ProductUnit.PCS, quantity: 0 }
 ]
 
-export const DEBTOR_DATA_1 = [
-	{ name: 'Салимов Азиз', phone: '+998901234567' },
-	{ name: 'Рахимова Гульноза', phone: '+998902345678' },
-	{ name: 'Умаров Бахтиёр', phone: '+998903456789' },
-	{ name: 'Каримова Зухра', phone: '+998904567890' },
-	{ name: 'Турсунов Фаррух', phone: '+998905678901' }
+/**
+ * Должники — по одному на каждый «сценарий», чтобы все состояния интерфейса
+ * (риск, просрочка, «скоро срок», закрытые, без срока, превышенный лимит,
+ * свежий долг) на живых данных были непустыми. Порядок важен: сами долги
+ * привязаны к должникам по индексу в seed.ts (DEBT_PLANS).
+ *
+ * remindedDaysAgo — когда последний раз напоминали (null — ни разу).
+ */
+export interface DebtorSeed {
+	name: string
+	phone: string
+	note: string | null
+	creditLimit: number | null
+	defaultDueDays: number | null
+	remindedDaysAgo: number | null
+}
+
+export const DEBTOR_DATA_1: DebtorSeed[] = [
+	{ name: 'Салимов Азиз', phone: '+998901234567', note: null, creditLimit: 500000, defaultDueDays: 14, remindedDaysAgo: null },
+	{ name: 'Рахимова Гульноза', phone: '+998902345678', note: 'Звонить после обеда', creditLimit: 150000, defaultDueDays: 7, remindedDaysAgo: 2 },
+	{ name: 'Умаров Бахтиёр', phone: '+998903456789', note: 'Ряд 5, лавка 12', creditLimit: 300000, defaultDueDays: 10, remindedDaysAgo: 1 },
+	{ name: 'Каримова Зухра', phone: '+998904567890', note: null, creditLimit: 400000, defaultDueDays: 14, remindedDaysAgo: null },
+	{ name: 'Турсунов Фаррух', phone: '+998905678901', note: 'Платит всегда в срок', creditLimit: null, defaultDueDays: 30, remindedDaysAgo: null },
+	{ name: 'Назаров Рустам', phone: '+998906789012', note: 'Срок обговаривает сам', creditLimit: 200000, defaultDueDays: null, remindedDaysAgo: 6 },
+	{ name: 'Алиев Тимур', phone: '+998907890123', note: 'Новый клиент, пришёл по рекомендации', creditLimit: 100000, defaultDueDays: 7, remindedDaysAgo: null }
 ]
 
-export const DEBTOR_DATA_2 = [
-	{ name: 'Азимова Наргиза', phone: '+998911234567' },
-	{ name: 'Собиров Джамшид', phone: '+998912345678' },
-	{ name: 'Исламова Мухаббат', phone: '+998913456789' },
-	{ name: 'Хакимов Шерзод', phone: '+998914567890' },
-	{ name: 'Усманова Лола', phone: '+998915678901' }
+export const DEBTOR_DATA_2: DebtorSeed[] = [
+	{ name: 'Азимова Наргиза', phone: '+998911234567', note: null, creditLimit: 500000, defaultDueDays: 14, remindedDaysAgo: null },
+	{ name: 'Собиров Джамшид', phone: '+998912345678', note: 'Звонить после 18:00', creditLimit: 150000, defaultDueDays: 7, remindedDaysAgo: 3 },
+	{ name: 'Исламова Мухаббат', phone: '+998913456789', note: 'Лавка у входа, ряд 2', creditLimit: 300000, defaultDueDays: 10, remindedDaysAgo: 1 },
+	{ name: 'Хакимов Шерзод', phone: '+998914567890', note: null, creditLimit: 400000, defaultDueDays: 14, remindedDaysAgo: null },
+	{ name: 'Усманова Лола', phone: '+998915678901', note: 'Платит всегда в срок', creditLimit: null, defaultDueDays: 30, remindedDaysAgo: null },
+	{ name: 'Бекмуродов Санжар', phone: '+998916789012', note: 'Срок обговаривает сам', creditLimit: 200000, defaultDueDays: null, remindedDaysAgo: 5 },
+	{ name: 'Ходжаева Дилафруз', phone: '+998917890123', note: 'Новый клиент', creditLimit: 100000, defaultDueDays: 7, remindedDaysAgo: null }
 ]
