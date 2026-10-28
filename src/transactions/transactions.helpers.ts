@@ -4,6 +4,9 @@ import { DebtStatusFilter } from '../enums'
 
 export const transactionInclude = {
 	items: {
+		// Закупочная цена строки — внутренние данные для прибыли. Транзакции
+		// читает и SELLER, поэтому наружу она не уходит ни в одном ответе.
+		omit: { costPrice: true },
 		include: {
 			product: { select: { id: true, name: true, price: true, image: true } }
 		}
@@ -30,6 +33,7 @@ export const transactionInclude = {
  */
 export const transactionListInclude = {
 	items: {
+		omit: { costPrice: true },
 		include: {
 			product: { select: { id: true, name: true, price: true, image: true } }
 		}

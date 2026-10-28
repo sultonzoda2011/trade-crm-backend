@@ -84,6 +84,9 @@ export class TransactionResponseDto {
   @ApiPropertyOptional({ description: 'Optional customer name for a SALE transaction ("who it was sold to")' })
   customerName?: string
 
+  @ApiPropertyOptional({ description: 'Free-form note; on a REFUND it holds the refund reason' })
+  note?: string
+
   @ApiProperty()
   type: string
 

@@ -15,6 +15,7 @@ import { QueryProductDto } from './dto/query-product.dto'
 import { ProductResponseDto } from './dto/product-response.dto'
 import { PaginatedResult } from '../common/dto/pagination.dto'
 import { AnalyticsPeriod, PeriodQueryDto } from '../common/dto/period-query.dto'
+import { stripCostPrice } from '../common/utils/strip-cost.util'
 import { Express } from 'express'
 
 // SELLER по бизнес-требованиям проекта не имеет доступа к складу/товарам —
@@ -66,8 +67,10 @@ export class ProductsController {
   @ApiQuery({ name: 'search', required: false, description: 'Search by product name' })
   @ApiQuery({ name: 'page', required: false, example: 1, description: 'Page number (1-based)' })
   @ApiQuery({ name: 'limit', required: false, example: 20, description: 'Items per page (max 100)' })
-  findAll(@Query() query: QueryProductDto, @CurrentUser() user: JwtPayload): Promise<PaginatedResult<unknown>> {
-    return this.productsService.findAll(query, user.marketId)
+  async findAll(@Query() query: QueryProductDto, @CurrentUser() user: JwtPayload): Promise<PaginatedResult<unknown>> {
+    const result = await this.productsService.findAll(query, user.marketId)
+    // Закупочная цена — данные владельца: продавец видит каталог без неё.
+    return user.role === Role.SELLER ? stripCostPrice(result) : result
   }
 
   @Get(':id')
@@ -75,12 +78,13 @@ export class ProductsController {
   @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Product ID' })
   @ApiQuery({ name: 'period', required: false, enum: AnalyticsPeriod, description: 'Metrics window. Default: month' })
   @ApiOkResponse({ type: ProductResponseDto, description: 'The found product' })
-  findOne(
+  async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: JwtPayload,
     @Query() query: PeriodQueryDto,
   ) {
-    return this.productsService.findOne(id, user.marketId, query.period)
+    const product = await this.productsService.findOne(id, user.marketId, query.period)
+    return user.role === Role.SELLER ? stripCostPrice(product) : product
   }
 
   @Patch(':id')

@@ -71,6 +71,9 @@ model Product {
   description       String?
   categoryId        String?
   lowStockThreshold Int               @default(0)
+  // Закупочная цена за единицу. Необязательна: у существующих товаров её нет,
+  // и для них прибыль не считается. Меняется только вручную в карточке товара.
+  costPrice         Float?
   unit              ProductUnit       @default(PCS)
   category          Category?         @relation(fields: [categoryId], references: [id])
   market            Market            @relation(fields: [marketId], references: [id])
@@ -122,6 +125,9 @@ model Transaction {
   // Необязательный покупатель для SALE-транзакции («кому продали»).
   // Для DEBT не используется: там покупатель — должник (debtorId).
   customerName    String?
+  // Свободная заметка к чеку («заберёт завтра», «скидка по договорённости»).
+  // У REFUND-транзакции здесь хранится причина возврата.
+  note            String?
   // Одна SALE может иметь НЕСКОЛЬКО частичных возвратов, поэтому здесь нет
   // @unique. Ограничение «нельзя вернуть больше купленного» держится на
   // TransactionItem.refundedQuantity, а не на уникальности этой связи.
@@ -149,6 +155,9 @@ model TransactionItem {
   productName   String
   quantity      Int
   price         Float
+  // Снимок закупочной цены на момент продажи: смена costPrice у товара не
+  // должна переписывать прибыль по уже закрытым чекам. null — цена не была задана.
+  costPrice     Float?
   totalPrice    Float
   discount      Float       @default(0)
   // Надбавка сверху цены за эту позицию — противоположность discount.

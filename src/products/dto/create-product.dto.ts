@@ -38,6 +38,17 @@ export class CreateProductDto {
 	@Min(0.01)
 	price: number
 
+	@ApiPropertyOptional({
+		example: 1,
+		description:
+			'Purchase price per unit (optional, minimum 0). Used for profit; hidden from sellers.'
+	})
+	@IsOptional()
+	@Type(() => Number)
+	@IsNumber()
+	@Min(0)
+	costPrice?: number
+
 	@ApiProperty({ example: 100, description: 'Available quantity (minimum 0)' })
 	@Type(() => Number)
 	@IsInt()

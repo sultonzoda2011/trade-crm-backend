@@ -70,6 +70,25 @@ export class CreateTransactionDto {
   @IsDateString()
   dueDate?: string
 
+  @ApiPropertyOptional({
+    example: 'Заберёт завтра',
+    description: 'Free-form note on the receipt (max 500 characters).',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string
+
+  @ApiPropertyOptional({
+    example: 100,
+    description:
+      'Advance paid at the moment of a DEBT sale. Must be less than the total — the rest stays as debt, and a Payment is recorded for the advance. Not allowed for SALE (a SALE is always paid in full).',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.01)
+  paidAmount?: number
+
   @ApiProperty({ type: [CreateTransactionItemDto] })
   @IsArray()
   @ArrayMinSize(1)
