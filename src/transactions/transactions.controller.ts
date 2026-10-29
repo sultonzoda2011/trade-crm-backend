@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseInterceptors } from '@nestjs/common'
-import { ApiBearerAuth, ApiCreatedResponse, ApiHeader, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger'
+import { ApiBearerAuth, ApiCreatedResponse, ApiHeader, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
 import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Roles } from '../auth/decorators/roles.decorator'
@@ -34,6 +34,18 @@ export class TransactionsController {
   @ApiCreatedResponse({ type: TransactionResponseDto })
   create(@Body() dto: CreateTransactionDto, @CurrentUser() user: JwtPayload) {
     return this.transactionsService.create(dto, user)
+  }
+
+  // Должен стоять выше ':id': иначе "summary" уйдёт в ParseUUIDPipe и вернёт 400.
+  @Get('summary')
+  @ApiOperation({
+    summary: 'Totals above the transactions list',
+    description:
+      'Sales / debts / refunds counts and amounts for the same filters as GET /transactions, across all pages. netAmount = sales + debts - refunds.',
+  })
+  @ApiOkResponse({ description: 'Aggregated totals' })
+  summary(@Query() query: QueryTransactionDto, @CurrentUser() user: JwtPayload) {
+    return this.transactionsService.summary(query, user.marketId)
   }
 
   @Get()
@@ -80,11 +92,13 @@ export class TransactionsController {
     return this.transactionsService.update(id, dto, user.marketId)
   }
 
+  // SELLER может отменить только свою недавнюю запись о долге без платежей —
+  // правило проверяется в сервисе.
   @Delete(':id')
-  @Roles(Role.ADMIN, Role.OWNER)
+  @Roles(Role.ADMIN, Role.OWNER, Role.SELLER)
   @ApiOkResponse({ description: 'Transaction deleted' })
   remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
-    return this.transactionsService.remove(id, user.marketId)
+    return this.transactionsService.remove(id, user.marketId, user)
   }
 
   @Patch(':id/pay')

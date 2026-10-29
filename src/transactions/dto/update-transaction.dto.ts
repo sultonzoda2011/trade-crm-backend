@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger'
-import { IsDateString, IsOptional, IsUUID } from 'class-validator'
+import { IsDateString, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator'
 
 export class UpdateTransactionDto {
   @ApiPropertyOptional({ example: 'debtor-uuid' })
@@ -11,4 +11,13 @@ export class UpdateTransactionDto {
   @IsOptional()
   @IsDateString()
   dueDate?: string
+
+  @ApiPropertyOptional({
+    description:
+      'Note on the receipt. Unlike the other fields it can be edited on a finalized transaction too — it does not affect any amounts.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string
 }

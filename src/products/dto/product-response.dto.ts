@@ -54,6 +54,9 @@ export class ProductResponseDto {
   @ApiProperty({ description: 'Product price' })
   price: number
 
+  @ApiPropertyOptional({ description: 'Purchase price per unit. Returned to ADMIN/OWNER only — never to SELLER.' })
+  costPrice?: number
+
   @ApiProperty({ description: 'Available quantity' })
   quantity: number
 

@@ -29,6 +29,9 @@ import {
 	transactionListInclude
 } from './transactions.helpers'
 
+// Окно, в течение которого продавец может сам отменить свою ошибочную запись.
+const SELLER_CANCEL_WINDOW_MS = 10 * 60 * 1000
+
 @Injectable()
 export class TransactionsService {
 	constructor(private readonly prisma: PrismaService) {}
@@ -56,6 +59,14 @@ export class TransactionsService {
 		// в customerName («кому продали»). Переданный для SALE debtorId молча
 		// игнорируется — долговая связка без долга бессмысленна.
 		const debtorId = isDebt ? dto.debtorId : null
+
+		// Аванс имеет смысл только у долга: SALE и так оплачена целиком.
+		if (dto.paidAmount != null && !isDebt) {
+			throw new BadRequestException(
+				'Advance payment (paidAmount) is only allowed for DEBT transactions'
+			)
+		}
+		const advance = round2(dto.paidAmount ?? 0)
 
 		const productIds = [...new Set(dto.items.map(i => i.productId))]
 
@@ -106,11 +117,21 @@ export class TransactionsService {
 					productName: product.name,
 					quantity: item.quantity,
 					price: product.price,
+					costPrice: product.costPrice ?? null,
 					discount,
 					markup,
 					totalPrice: lineTotal
 				}
 			})
+
+			// Аванс обязан быть меньше суммы: если клиент отдал всё, это уже
+			// не долг, а обычная продажа — иначе в БД появится «долг» с нулевым
+			// остатком, который ни к чему не привязан.
+			if (advance > 0 && advance >= round2(itemsTotal)) {
+				throw new BadRequestException(
+					'Advance payment must be less than the total; record a fully paid purchase as a SALE'
+				)
+			}
 
 			// Проверяем остаток и списываем сток атомарно: decrement только если
 			// quantity >= списываемого количества, иначе запись не обновится и мы
@@ -139,20 +160,37 @@ export class TransactionsService {
 					totalAmount: itemsTotal,
 					discountAmount: itemsData.reduce((s, i) => s + i.discount, 0),
 					markupAmount: itemsData.reduce((s, i) => s + i.markup, 0),
-					remainingAmount: isDebt ? itemsTotal : 0,
-					status: isDebt ? TransactionStatus.ACTIVE : TransactionStatus.PAID,
+					note: dto.note?.trim() || null,
+					remainingAmount: isDebt ? round2(itemsTotal - advance) : 0,
+					// Долг с авансом сразу «частично оплачен», без аванса — «активен».
+					status: !isDebt
+						? TransactionStatus.PAID
+						: advance > 0
+							? TransactionStatus.PARTIAL
+							: TransactionStatus.ACTIVE,
 					dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
-					items: { create: itemsData }
+					items: { create: itemsData },
+					// Аванс — обычный Payment: так он попадает в историю платежей,
+					// timeline и денежные отчёты наравне с остальными оплатами.
+					payments:
+						advance > 0
+							? { create: { amount: advance, createdById: user.sub } }
+							: undefined
 				},
 				include: transactionInclude
 			})
 		})
 	}
 
-	async findAll(
+	/**
+	 * Условия выборки списка транзакций. Вынесены отдельно, потому что итоги
+	 * над списком (summary) обязаны считаться по тем же фильтрам, что и сам
+	 * список, — иначе цифры сверху не сойдутся со строками снизу.
+	 */
+	private buildWhere(
 		query: QueryTransactionDto,
 		userMarketId?: string
-	): Promise<PaginatedResult<unknown>> {
+	): Prisma.TransactionWhereInput {
 		const where: Prisma.TransactionWhereInput = {}
 
 		if (userMarketId) where.marketId = userMarketId
@@ -191,6 +229,15 @@ export class TransactionsService {
 		}
 		if (query.debtStatus) applyDebtStatusFilter(where, query.debtStatus)
 
+		return where
+	}
+
+	async findAll(
+		query: QueryTransactionDto,
+		userMarketId?: string
+	): Promise<PaginatedResult<unknown>> {
+		const where = this.buildWhere(query, userMarketId)
+
 		return paginate(
 			query,
 			({ skip, take }) =>
@@ -209,6 +256,49 @@ export class TransactionsService {
 				}),
 			() => this.prisma.transaction.count({ where })
 		)
+	}
+
+	/**
+	 * Итоги над списком: сколько продано, сколько выдано в долг, сколько
+	 * вернули и сколько долга ещё не оплачено — по всем страницам сразу, с теми
+	 * же фильтрами, что у списка. Страница на фронте видит только 20 строк,
+	 * поэтому сумму по ней считать нельзя.
+	 */
+	async summary(query: QueryTransactionDto, userMarketId?: string) {
+		const where = this.buildWhere(query, userMarketId)
+
+		const groups = await this.prisma.transaction.groupBy({
+			by: ['type'],
+			where,
+			_count: { _all: true },
+			_sum: { totalAmount: true, remainingAmount: true }
+		})
+
+		const pick = (type: TransactionType) => {
+			const group = groups.find(g => g.type === type)
+			return {
+				count: group?._count._all ?? 0,
+				amount: round2(group?._sum.totalAmount ?? 0),
+				remaining: round2(group?._sum.remainingAmount ?? 0)
+			}
+		}
+
+		const sales = pick(TransactionType.SALE)
+		const debts = pick(TransactionType.DEBT)
+		const refunds = pick(TransactionType.REFUND)
+
+		return {
+			count: sales.count + debts.count + refunds.count,
+			sales: { count: sales.count, amount: sales.amount },
+			debts: {
+				count: debts.count,
+				amount: debts.amount,
+				remaining: debts.remaining
+			},
+			refunds: { count: refunds.count, amount: refunds.amount },
+			// Чистая сумма: продано (в т.ч. в долг) минус возвраты.
+			netAmount: round2(sales.amount + debts.amount - refunds.amount)
+		}
 	}
 
 	async findOne(id: string, userMarketId?: string) {
@@ -282,7 +372,14 @@ export class TransactionsService {
 			TransactionStatus.REFUNDED,
 			TransactionStatus.PARTIALLY_REFUNDED
 		]
-		if (finalizedStatuses.includes(transaction.status as TransactionStatus)) {
+		// Заметка не влияет ни на суммы, ни на остатки, поэтому её можно править
+		// и у закрытой транзакции — иначе note у оплаченной продажи нельзя
+		// было бы дополнить после оформления.
+		const onlyNote = Object.keys(dto).every(key => key === 'note')
+		if (
+			!onlyNote &&
+			finalizedStatuses.includes(transaction.status as TransactionStatus)
+		) {
 			throw new BadRequestException(
 				'Cannot edit a finalized transaction (PAID, REFUNDED or PARTIALLY_REFUNDED). Use /pay endpoint for payments.'
 			)
@@ -308,8 +405,36 @@ export class TransactionsService {
 		})
 	}
 
-	async remove(id: string, userMarketId?: string) {
+	async remove(id: string, userMarketId?: string, actor?: JwtPayload) {
 		const transaction = await this.findOne(id, userMarketId)
+
+		// Продавец может отменить только СВОЮ недавнюю ошибочную запись: чужие
+		// и «старые» транзакции — решение владельца. Если по долгу уже есть
+		// платежи, удаление стёрло бы историю денег, поэтому такое — тоже
+		// только владельцу.
+		if (actor?.role === Role.SELLER) {
+			if (transaction.createdById !== actor.sub) {
+				throw new ForbiddenException(
+					'Sellers can only cancel their own transactions'
+				)
+			}
+			if (transaction.type !== TransactionType.DEBT) {
+				throw new ForbiddenException('Sellers can only cancel DEBT transactions')
+			}
+			if (Date.now() - transaction.createdAt.getTime() > SELLER_CANCEL_WINDOW_MS) {
+				throw new ForbiddenException(
+					'A transaction can be cancelled by its seller only within 10 minutes'
+				)
+			}
+			const paymentCount = await this.prisma.payment.count({
+				where: { transactionId: id }
+			})
+			if (paymentCount > 0) {
+				throw new ForbiddenException(
+					'A transaction with payments can only be removed by the owner'
+				)
+			}
+		}
 
 		// Продажу с возвратами удалять нельзя: её строки — база для расчёта
 		// refundedQuantity, и удаление оставило бы возвраты без исходника.
@@ -540,6 +665,7 @@ export class TransactionsService {
 				productId: item.productId,
 				productName: item.productName,
 				price: item.price,
+				costPrice: item.costPrice,
 				discount: round2((item.discount / item.quantity) * quantity),
 				markup: round2((item.markup / item.quantity) * quantity),
 				totalPrice: round2(unitNet * quantity)
@@ -581,6 +707,8 @@ export class TransactionsService {
 					debtorId: original.debtorId,
 					refundOfId: original.id,
 					type: TransactionType.REFUND,
+					// Причина возврата живёт в note REFUND-транзакции.
+					note: dto.reason?.trim() || null,
 					paymentType: original.paymentType,
 					totalAmount: refundTotal,
 					discountAmount: round2(
@@ -597,6 +725,7 @@ export class TransactionsService {
 							productName: line.productName,
 							quantity: line.quantity,
 							price: line.price,
+							costPrice: line.costPrice,
 							discount: line.discount,
 							markup: line.markup,
 							totalPrice: line.totalPrice,
