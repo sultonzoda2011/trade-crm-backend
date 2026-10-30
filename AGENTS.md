@@ -25,7 +25,7 @@
 - Unit tests use **jest + ts-jest** (`jest.config.js`), no DB access — Prisma is mocked.
 - `jest.config.js`: `rootDir: 'src'`, `testRegex: '.*\\.spec\\.ts$'`, `clearMocks: true`, coverage output `../coverage`.
 - Specs live next to sources as `*.spec.ts`; `tsconfig.build.json` excludes them from the build.
-- 12 spec files cover:
+- 13 spec files cover:
   - `analytics/analytics.service.spec.ts` (sales velocity, stock health, reorder priority, debtor risk, period comparisons)
   - `auth/strategies/jwt.strategy.spec.ts` (60s user cache & deleted-user eviction)
   - `common/interceptors/idempotency.interceptor.spec.ts` (`Idempotency-Key` deduplication & replay)
@@ -35,8 +35,9 @@
   - `debtors/debtors.service.spec.ts` (debtor CRUD, summary metrics, credit profile)
   - `health/health.controller.spec.ts` (DB up/down probe)
   - `markets/markets.service.spec.ts` (**IDOR scoping** on update/remove)
-  - `products/products.service.spec.ts` (atomic `restock`, market scoping, stock limit validation)
-  - `transactions/transactions.service.spec.ts` (role restrictions, debtor IDOR, pricing/discount/markup, atomic stock decrement, full & partial refunds)
+  - `products/products.service.spec.ts` (stock journal on create/restock/write-off/adjust, archive, bulk price, summary, market scoping)
+  - `products/dto/query-product.dto.spec.ts` (`?flag=false` parsing, rolling-window range)
+  - `transactions/transactions.service.spec.ts` (role restrictions, debtor IDOR, pricing/discount/markup, atomic stock decrement, full & partial refunds, stock journal SALE/REFUND/VOID, archived products)
   - `users/users.service.spec.ts` (last-admin protection on remove/demote)
 
 ## CI
@@ -57,9 +58,10 @@
 - Import `Prisma` namespace / client types from `@prisma/client` (not `prisma/generated/` — that folder is legacy and stale).
 - `PrismaService` uses `@prisma/adapter-pg` — the adapter is constructed with the raw `DATABASE_URL` env var, not via PrismaClient's `datasources`.
 - DB config: `prisma.config.ts` (Prisma v7 config file format, not `prisma/schema.prisma` for datasource URLs).
-- Migrations: `prisma/migrations/`.
+- Migrations: the repo has no `prisma/migrations/` yet; schema changes ship as idempotent SQL in `prisma/sql/` (run with an `npm run db:*` script) and must leave the DB identical to what `prisma db push` would create.
+- **Stock journal migration**: `npm run db:stock-movements` (`prisma/sql/20261029_stock_movements.sql`) — creates `StockMovement`, adds `Product.isActive/archivedAt`, backfills each non-zero stock as an `OPENING` movement. Safe to re-run; keeps all data.
 - Run `prisma generate` after any schema change (`npm run prisma:generate`), otherwise `npx tsc` will fail against stale types.
-- Models: `User, Market, Category, Product, Debtor, Transaction, TransactionItem, Payment, ThrottleBucket, IdempotencyRecord`.
+- Models: `User, Market, Category, Product, StockMovement, Debtor, Transaction, TransactionItem, Payment, SellerCredit, ThrottleBucket, IdempotencyKey`.
 - `Transaction` has a self-relation for refunds (`refundOfId String?`, relation `"TransactionRefund"`), plus composite indexes `@@index([marketId, type, createdAt])` and `@@index([createdById, type, createdAt])`.
 - `TransactionItem` stores `price`, `discount`, `markup`, `totalPrice`, `refundedQuantity`, and `refundOfItemId` to support line-level discounts/markups and partial refunds.
 - `PrismaService.onModuleInit()` sweeps stale `ThrottleBucket` rows and expired `IdempotencyRecord` rows (`expiresAt < now()`), wrapped in try/catch so a missing migration doesn't crash boot.
@@ -179,7 +181,16 @@ Token internals (`auth.service.ts` / `src/interfaces/jwt-payload.interface.ts`):
 ## Products domain rules
 
 - `GET /products` and `GET /products/:id` are accessible to `ADMIN`, `OWNER`, and `SELLER` (sellers need product catalog access to create transactions), while write operations (`POST /`, `PATCH /:id`, `POST /:id/restock`, `DELETE /:id`) require `ADMIN` or `OWNER`.
-- `POST /products/:id/restock` (`RestockProductDto: { quantity }`) atomically increments product stock inside the database (`quantity: { increment }` guarded by `quantity <= MAX_PRODUCT_QUANTITY - dto.quantity`) so concurrent sales are never overwritten by a stale `PATCH`.
+- **Stock changes only through the journal.** `Product.quantity` is the fast "current number", but it is moved only by `moveStock()` + `logMovement(s)` (`src/products/stock.util.ts`) inside one DB transaction, so for every product `Σ StockMovement.delta = quantity` (verified by the seed). Movement types: `OPENING` (product created / journal backfill), `SALE`, `REFUND`, `VOID` (receipt deleted — opposite sign), `RESTOCK`, `WRITE_OFF` (needs a reason: `DAMAGED | EXPIRED | LOST | OWN_USE | OTHER`), `ADJUSTMENT` (inventory count). Rows are never edited; deleting a receipt sets `transactionId` to NULL but keeps the row. Never `product.update({ quantity })` directly.
+- `PATCH /products/:id` does **not** accept `quantity` (400 via `forbidNonWhitelisted`) — it would overwrite sales made meanwhile. Use the actions below.
+- `POST /products/:id/restock` (`{ quantity, note? }`) adds to stock atomically (`increment` guarded by `quantity <= MAX_STOCK - quantity`).
+- `POST /products/:id/write-off` (`{ quantity, reason, note? }`) removes stock atomically, never below zero (400 `PRODUCT_NOT_ENOUGH_STOCK` with `details.available`).
+- `POST /products/:id/adjust` (`{ quantity, note? }`) inventory count: sets the counted TOTAL and journals the difference; 409 `PRODUCT_STOCK_CHANGED` (`details.currentQuantity`) if stock changed while counting.
+- `GET /products/:id/movements` (ADMIN/OWNER) — paginated journal, newest first, filter `type`, `dateFrom/dateTo`.
+- `POST /products/:id/archive` / `unarchive` — archive replaces deletion for products with history: archived products are hidden from `GET /products` (use `?archived=true` to list them), cannot be sold (400 "archived"), and are excluded from dashboard stock health. `DELETE` of a product with receipts answers 409 `PRODUCT_HAS_TRANSACTIONS` with `details.canArchive: true`; a product without history is deleted together with its journal.
+- `GET /products/summary` (ADMIN/OWNER) — active/archived counts, out-of-stock, low-stock, stock value at retail and at cost, potential profit, `productsWithoutCost`. Static routes (`summary`, `bulk-price`) are declared **before** `:id`.
+- `POST /products/bulk-price` (ADMIN/OWNER, needs a market) — `{ percent, categoryId?, roundTo?, dryRun? }`: one `UPDATE` changing prices of active products by ±N% rounded to a step (min price = one step). `dryRun: true` previews up to 20 rows and writes nothing. Past receipts keep their own price snapshot; `costPrice` is untouched. There is no price history table yet.
+- `GET /products` metrics window: `?days=N` (rolling, 1–365) overrides `?period=` (calendar). Boolean query flags (`lowStock`, `needsReorder`, `archived`) go through `toBoolean` — `@Type(() => Boolean)` would turn `"false"` into `true`.
 
 ## Transactions domain rules
 
@@ -209,6 +220,7 @@ Token internals (`auth.service.ts` / `src/interfaces/jwt-payload.interface.ts`):
 
 - Run `npm run prisma:seed` against an empty/migrated DB. It **wipes all tables** first (incl. `IdempotencyKey`, `ThrottleBucket`).
 - Deterministic (no `Math.random`), relative to "now": 2 markets × (owner + sellers, 5 categories, 25 products, 7 debtors, 45 sales, 18 debts, 9 refunds). Re-seed right before testing the 10-minute seller-cancel rule — the "fresh" debt is created 3 minutes before the seed ran.
+- The seed also writes the stock journal (≈195 movements per market: opening balances, sales, refunds, restocks, write-offs, one cancelled receipt as `SALE`+`VOID`, an inventory `ADJUSTMENT`) and archives one product per market; it throws if `Σ delta ≠ quantity` for any product.
 - Coverage is intentional, so no screen/query is empty: debtor scenarios (reliable / overdue + over credit limit / due soon / advance / settled / no due date / new), debts with advance, partial and full payments, notes, refund reasons, partial + repeated refunds, markup + seller payouts, low/zero/dead stock, products without `costPrice`, sales today/yesterday/last year (for period comparisons), varied hours (heatmap).
 - Logins (password `12345678Aa` for all): `admin@tradecrm.com` (ADMIN); `alisher@tradecrm.com`, `dilnoza@tradecrm.com` (OWNER); sellers `sultonzoda2011@gmail.com`, `bakhtiyar@`, `madina@` (market 1, @tradecrm.com except the first) and `jasur@`, `nigora@` (market 2).
 - No images are uploaded (all `image` fields are null).

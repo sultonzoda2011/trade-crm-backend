@@ -66,6 +66,12 @@ export class ProductResponseDto {
   @ApiProperty({ description: 'Low stock threshold' })
   lowStockThreshold: number
 
+  @ApiProperty({ description: 'false — the product is archived: hidden from the catalog and sales, history kept' })
+  isActive: boolean
+
+  @ApiPropertyOptional({ description: 'When the product was archived' })
+  archivedAt?: string
+
   @ApiPropertyOptional({ description: 'Product image URL' })
   image?: string
 

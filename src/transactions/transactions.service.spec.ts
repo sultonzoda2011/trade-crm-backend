@@ -160,8 +160,10 @@ prisma.$transaction.mockImplementation((cb: any) =>
 							categoryId: null
 						}
 					]),
-					updateMany: jest.fn().mockResolvedValue({ count: 1 })
+					updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+					findUniqueOrThrow: jest.fn().mockResolvedValue({ quantity: 8 })
 				},
+				stockMovement: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
 				transaction: {
 					create: jest
 						.fn()
@@ -219,8 +221,10 @@ prisma.$transaction.mockImplementation((cb: any) =>
 							categoryId: null
 						}
 					]),
-					updateMany: jest.fn().mockResolvedValue({ count: 1 })
+					updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+					findUniqueOrThrow: jest.fn().mockResolvedValue({ quantity: 8 })
 				},
+				stockMovement: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
 				transaction: { create: jest.fn().mockResolvedValue({ id: 'tx1' }) }
 			}
 			prisma.$transaction.mockImplementation((cb: any) => cb(tx))
@@ -253,8 +257,10 @@ prisma.$transaction.mockImplementation((cb: any) =>
 							categoryId: null
 						}
 					]),
-					updateMany: jest.fn().mockResolvedValue({ count: 1 })
+					updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+					findUniqueOrThrow: jest.fn().mockResolvedValue({ quantity: 8 })
 				},
+				stockMovement: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
 				transaction: { create: jest.fn().mockResolvedValue({ id: 'tx1' }) }
 			}
 			prisma.$transaction.mockImplementation((cb: any) => cb(tx))
@@ -287,8 +293,10 @@ prisma.$transaction.mockImplementation((cb: any) =>
 							categoryId: null
 						}
 					]),
-					updateMany: jest.fn().mockResolvedValue({ count: 1 })
+					updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+					findUniqueOrThrow: jest.fn().mockResolvedValue({ quantity: 8 })
 				},
+				stockMovement: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
 				transaction: { create: jest.fn().mockResolvedValue({ id: 'tx1' }) }
 			}
 			prisma.$transaction.mockImplementation((cb: any) => cb(tx))
@@ -427,7 +435,8 @@ prisma.$transaction.mockImplementation((cb: any) =>
 		it('restores stock, creates REFUND linked to original, marks original REFUNDED', async () => {
 			prisma.transaction.findUnique.mockResolvedValue(paidSale)
 			const tx = {
-				product: { update: jest.fn().mockResolvedValue({}) },
+				product: { update: jest.fn().mockResolvedValue({ quantity: 12 }) },
+				stockMovement: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
 				transactionItem: {
 					updateMany: jest.fn().mockResolvedValue({ count: 1 })
 				},
@@ -447,7 +456,8 @@ prisma.$transaction.mockImplementation((cb: any) =>
 
 			expect(tx.product.update).toHaveBeenCalledWith({
 				where: { id: 'p1' },
-				data: { quantity: { increment: 2 } }
+				data: { quantity: { increment: 2 } },
+				select: { quantity: true }
 			})
 			const data = tx.transaction.create.mock.calls[0][0].data
 			expect(data.type).toBe(TransactionType.REFUND)
@@ -467,7 +477,8 @@ prisma.$transaction.mockImplementation((cb: any) =>
 				items: [{ ...paidSale.items[0], costPrice: 60 }]
 			})
 			const tx = {
-				product: { update: jest.fn().mockResolvedValue({}) },
+				product: { update: jest.fn().mockResolvedValue({ quantity: 12 }) },
+				stockMovement: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
 				transactionItem: {
 					updateMany: jest.fn().mockResolvedValue({ count: 1 })
 				},
@@ -500,8 +511,10 @@ prisma.$transaction.mockImplementation((cb: any) =>
 			debtor: { findUnique: jest.fn().mockResolvedValue({ marketId }) },
 			product: {
 				findMany: jest.fn().mockResolvedValue([milk]),
-				updateMany: jest.fn().mockResolvedValue({ count: 1 })
+				updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+				findUniqueOrThrow: jest.fn().mockResolvedValue({ quantity: 8 })
 			},
+			stockMovement: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
 			transaction: { create: jest.fn().mockResolvedValue({ id: 'tx1' }) }
 		})
 
@@ -662,7 +675,8 @@ prisma.$transaction.mockImplementation((cb: any) =>
 						.fn()
 						.mockResolvedValue([{ productId: 'p1', quantity: 2, refundOfItemId: null }])
 				},
-				product: { update: jest.fn().mockResolvedValue({}) },
+				product: { update: jest.fn().mockResolvedValue({ quantity: 12 }) },
+				stockMovement: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
 				transaction: { delete: jest.fn().mockResolvedValue({}) }
 			}
 			prisma.$transaction.mockImplementation((cb: any) => cb(tx))
@@ -671,7 +685,8 @@ prisma.$transaction.mockImplementation((cb: any) =>
 
 			expect(tx.product.update).toHaveBeenCalledWith({
 				where: { id: 'p1' },
-				data: { quantity: { increment: 2 } }
+				data: { quantity: { increment: 2 } },
+				select: { quantity: true }
 			})
 			expect(tx.transaction.delete).toHaveBeenCalledWith({
 				where: { id: 'debt-1' }
@@ -731,6 +746,207 @@ prisma.$transaction.mockImplementation((cb: any) =>
 			expect(result.count).toBe(0)
 			expect(result.netAmount).toBe(0)
 			expect(result.debts.remaining).toBe(0)
+		})
+	})
+	describe('stock journal', () => {
+		const milk = { id: 'p1', name: 'Milk', price: 100, quantity: 10, isActive: true }
+		const bread = { id: 'p2', name: 'Bread', price: 50, quantity: 10, isActive: true }
+
+		it('logs a SALE movement per line with the balance after and the receipt id', async () => {
+			const tx = {
+				product: {
+					findMany: jest.fn().mockResolvedValue([milk, bread]),
+					updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+					findUniqueOrThrow: jest
+						.fn()
+						.mockResolvedValueOnce({ quantity: 8 })
+						.mockResolvedValueOnce({ quantity: 9 })
+				},
+				stockMovement: { createMany: jest.fn().mockResolvedValue({ count: 2 }) },
+				transaction: { create: jest.fn().mockResolvedValue({ id: 'tx-9' }) }
+			}
+			prisma.$transaction.mockImplementation((cb: any) => cb(tx))
+
+			await service.create(
+				{
+					type: TransactionType.SALE,
+					paymentType: 'CASH',
+					items: [
+						{ productId: 'p1', quantity: 2 },
+						{ productId: 'p2', quantity: 1 }
+					]
+				} as any,
+				ownerUser
+			)
+
+			expect(tx.stockMovement.createMany).toHaveBeenCalledWith({
+				data: [
+					expect.objectContaining({
+						productId: 'p1',
+						marketId,
+						type: 'SALE',
+						delta: -2,
+						balanceAfter: 8,
+						transactionId: 'tx-9',
+						createdById: ownerUser.sub
+					}),
+					expect.objectContaining({
+						productId: 'p2',
+						type: 'SALE',
+						delta: -1,
+						balanceAfter: 9,
+						transactionId: 'tx-9'
+					})
+				]
+			})
+		})
+
+		it('writes nothing to the journal when the stock is not enough', async () => {
+			const tx = {
+				product: {
+					findMany: jest.fn().mockResolvedValue([milk]),
+					updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+					findUniqueOrThrow: jest.fn()
+				},
+				stockMovement: { createMany: jest.fn() },
+				transaction: { create: jest.fn() }
+			}
+			prisma.$transaction.mockImplementation((cb: any) => cb(tx))
+
+			await expect(
+				service.create(
+					{
+						type: TransactionType.SALE,
+						paymentType: 'CASH',
+						items: [{ productId: 'p1', quantity: 99 }]
+					} as any,
+					ownerUser
+				)
+			).rejects.toThrow('Not enough stock')
+			expect(tx.stockMovement.createMany).not.toHaveBeenCalled()
+			expect(tx.transaction.create).not.toHaveBeenCalled()
+		})
+
+		it('refuses to sell an archived product and touches no stock', async () => {
+			const tx = {
+				product: {
+					findMany: jest.fn().mockResolvedValue([{ ...milk, isActive: false }]),
+					updateMany: jest.fn(),
+					findUniqueOrThrow: jest.fn()
+				},
+				stockMovement: { createMany: jest.fn() },
+				transaction: { create: jest.fn() }
+			}
+			prisma.$transaction.mockImplementation((cb: any) => cb(tx))
+
+			await expect(
+				service.create(
+					{
+						type: TransactionType.SALE,
+						paymentType: 'CASH',
+						items: [{ productId: 'p1', quantity: 1 }]
+					} as any,
+					ownerUser
+				)
+			).rejects.toThrow('archived')
+			expect(tx.product.updateMany).not.toHaveBeenCalled()
+		})
+
+		it('logs a REFUND movement linked to the refund receipt', async () => {
+			prisma.transaction.findUnique.mockResolvedValue({
+				id: 'sale-1',
+				marketId,
+				type: TransactionType.SALE,
+				status: TransactionStatus.PAID,
+				paymentType: 'CASH',
+				debtorId: null,
+				items: [
+					{
+						id: 'i1',
+						productId: 'p1',
+						productName: 'Milk',
+						quantity: 2,
+						price: 100,
+						discount: 0,
+						markup: 0,
+						totalPrice: 200,
+						refundedQuantity: 0
+					}
+				]
+			})
+			const tx = {
+				product: { update: jest.fn().mockResolvedValue({ quantity: 10 }) },
+				stockMovement: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
+				transactionItem: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+				transaction: {
+					create: jest.fn().mockResolvedValue({ id: 'refund-1' }),
+					update: jest.fn().mockResolvedValue({})
+				}
+			}
+			prisma.$transaction.mockImplementation((cb: any) => cb(tx))
+
+			await service.refund('sale-1', ownerUser)
+
+			expect(tx.stockMovement.createMany).toHaveBeenCalledWith({
+				data: [
+					expect.objectContaining({
+						productId: 'p1',
+						type: 'REFUND',
+						delta: 2,
+						balanceAfter: 10,
+						transactionId: 'refund-1'
+					})
+				]
+			})
+		})
+
+		it('logs VOID with the opposite sign when a REFUND is deleted', async () => {
+			prisma.transaction.findUnique.mockResolvedValue({
+				id: 'refund-1',
+				marketId,
+				type: TransactionType.REFUND,
+				status: TransactionStatus.PAID,
+				refundOfId: 'sale-1'
+			})
+			const tx = {
+				transactionItem: {
+					findMany: jest
+						.fn()
+						.mockResolvedValueOnce([
+							{ productId: 'p1', quantity: 2, refundOfItemId: 'i1' }
+						])
+						.mockResolvedValueOnce([{ quantity: 2, refundedQuantity: 0 }]),
+					update: jest.fn().mockResolvedValue({})
+				},
+				product: { update: jest.fn().mockResolvedValue({ quantity: 8 }) },
+				stockMovement: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
+				transaction: {
+					delete: jest.fn().mockResolvedValue({}),
+					update: jest.fn().mockResolvedValue({})
+				}
+			}
+			prisma.$transaction.mockImplementation((cb: any) => cb(tx))
+			prisma.transaction.count.mockResolvedValue(0)
+
+			await service.remove('refund-1', marketId, ownerUser)
+
+			expect(tx.product.update).toHaveBeenCalledWith({
+				where: { id: 'p1' },
+				data: { quantity: { increment: -2 } },
+				select: { quantity: true }
+			})
+			expect(tx.stockMovement.createMany).toHaveBeenCalledWith({
+				data: [
+					expect.objectContaining({
+						productId: 'p1',
+						marketId,
+						type: 'VOID',
+						delta: -2,
+						balanceAfter: 8,
+						transactionId: null
+					})
+				]
+			})
 		})
 	})
 })

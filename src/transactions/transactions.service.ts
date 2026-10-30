@@ -5,7 +5,7 @@ import {
 	NotFoundException,
 	UnauthorizedException
 } from '@nestjs/common'
-import { Prisma, TransactionStatus } from '@prisma/client'
+import { Prisma, StockMovementType, TransactionStatus } from '@prisma/client'
 import { PaginatedResult } from '../common/dto/pagination.dto'
 import {
 	buildDateWhere,
@@ -16,6 +16,7 @@ import { round2 } from '../common/utils/period.util'
 import { Role, TransactionType } from '../enums'
 import { JwtPayload } from '../interfaces'
 import { PrismaService } from '../prisma/prisma.service'
+import { logMovements, moveStock } from '../products/stock.util'
 import { CreatePaymentDto } from './dto/create-payment.dto'
 import { CreateTransactionDto } from './dto/create-transaction.dto'
 import { QueryTransactionDto } from './dto/query-transaction.dto'
@@ -96,6 +97,16 @@ export class TransactionsService {
 				)
 			}
 
+			// Архивный товар нельзя продать: он скрыт из каталога, и попасть в чек
+			// он мог только из устаревшего списка на экране (офлайн-очередь, открытая
+			// вкладка). Явная ошибка лучше, чем тихая продажа снятого с продажи товара.
+			const archived = products.find(p => p.isActive === false)
+			if (archived) {
+				throw new BadRequestException(
+					`Product "${archived.name}" is archived and cannot be sold`
+				)
+			}
+
 			const productMap = new Map(products.map(p => [p.id, p]))
 
 			// Цена и totalPrice всегда считаются от актуальной цены товара в БД,
@@ -136,20 +147,20 @@ export class TransactionsService {
 			// Проверяем остаток и списываем сток атомарно: decrement только если
 			// quantity >= списываемого количества, иначе запись не обновится и мы
 			// узнаём об этом по count === 0 в результате updateMany.
+			// Остаток после каждого списания нужен журналу движений (balanceAfter).
+			const balances: number[] = []
 			for (const item of dto.items) {
 				const product = productMap.get(item.productId)!
-				const result = await tx.product.updateMany({
-					where: { id: product.id, quantity: { gte: item.quantity } },
-					data: { quantity: { decrement: item.quantity } }
-				})
-				if (result.count === 0) {
+				const balance = await moveStock(tx, product.id, -item.quantity)
+				if (balance === null) {
 					throw new BadRequestException(
 						`Not enough stock for product "${product.name}"`
 					)
 				}
+				balances.push(balance)
 			}
 
-			return tx.transaction.create({
+			const created = await tx.transaction.create({
 				data: {
 					marketId,
 					createdById: user.sub,
@@ -179,6 +190,23 @@ export class TransactionsService {
 				},
 				include: transactionInclude
 			})
+
+			// Журнал пишется той же транзакцией БД, что и списание: остаток и его
+			// история не могут разойтись.
+			await logMovements(
+				tx,
+				dto.items.map((item, i) => ({
+					productId: item.productId,
+					marketId,
+					type: StockMovementType.SALE,
+					delta: -item.quantity,
+					balanceAfter: balances[i],
+					transactionId: created.id,
+					createdById: user.sub
+				}))
+			)
+
+			return created
 		})
 	}
 
@@ -460,10 +488,23 @@ export class TransactionsService {
 				where: { transactionId: id }
 			})
 
+			const voided: Parameters<typeof logMovements>[1] = []
 			for (const item of items) {
-				await tx.product.update({
+				const { quantity: balanceAfter } = await tx.product.update({
 					where: { id: item.productId },
-					data: { quantity: { increment: item.quantity * direction } }
+					data: { quantity: { increment: item.quantity * direction } },
+					select: { quantity: true }
+				})
+				// Чек удаляется, поэтому ссылку на него не держим (всё равно
+				// обнулилась бы при удалении) — вместо неё номер чека в заметке.
+				voided.push({
+					productId: item.productId,
+					marketId: transaction.marketId,
+					type: StockMovementType.VOID,
+					delta: item.quantity * direction,
+					balanceAfter,
+					note: `Отмена чека ${id.slice(0, 8)}`,
+					createdById: actor?.sub
 				})
 
 				// Откат возврата: освобождаем возвращённое количество на исходной
@@ -476,6 +517,8 @@ export class TransactionsService {
 					})
 				}
 			}
+
+			if (voided.length > 0) await logMovements(tx, voided)
 
 			await tx.transaction.delete({
 				where: { id }
@@ -677,6 +720,7 @@ export class TransactionsService {
 		)
 
 		return this.prisma.$transaction(async tx => {
+			const restored: { productId: string; quantity: number; balanceAfter: number }[] = []
 			for (const line of refundItems) {
 				// Атомарно двигаем refundedQuantity: обновляем только если
 				// с момента чтения его никто не увеличил. Это защищает от двух
@@ -694,9 +738,15 @@ export class TransactionsService {
 					)
 				}
 
-				await tx.product.update({
+				const { quantity: balanceAfter } = await tx.product.update({
 					where: { id: line.productId },
-					data: { quantity: { increment: line.quantity } }
+					data: { quantity: { increment: line.quantity } },
+					select: { quantity: true }
+				})
+				restored.push({
+					productId: line.productId,
+					quantity: line.quantity,
+					balanceAfter
 				})
 			}
 
@@ -735,6 +785,19 @@ export class TransactionsService {
 				},
 				include: transactionInclude
 			})
+
+			await logMovements(
+				tx,
+				restored.map(line => ({
+					productId: line.productId,
+					marketId,
+					type: StockMovementType.REFUND,
+					delta: line.quantity,
+					balanceAfter: line.balanceAfter,
+					transactionId: refundTx.id,
+					createdById: user.sub
+				}))
+			)
 
 			// REFUNDED только когда возвращено всё до последней единицы,
 			// иначе PARTIALLY_REFUNDED — продажа остаётся частично действующей.

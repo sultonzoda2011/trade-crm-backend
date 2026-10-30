@@ -11,6 +11,10 @@ import { ProductsService } from './products.service'
 import { CreateProductDto } from './dto/create-product.dto'
 import { UpdateProductDto } from './dto/update-product.dto'
 import { RestockProductDto } from './dto/restock-product.dto'
+import { WriteOffProductDto } from './dto/write-off-product.dto'
+import { AdjustStockDto } from './dto/adjust-stock.dto'
+import { BulkPriceDto } from './dto/bulk-price.dto'
+import { QueryMovementsDto } from './dto/query-movements.dto'
 import { QueryProductDto } from './dto/query-product.dto'
 import { ProductResponseDto } from './dto/product-response.dto'
 import { PaginatedResult } from '../common/dto/pagination.dto'
@@ -52,7 +56,7 @@ export class ProductsController {
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.productsService.create(dto, file, user.marketId)
+    return this.productsService.create(dto, file, user.marketId, user.sub)
   }
 
   // Каждый товар в выдаче обогащается метриками за период (скорость продаж,
@@ -67,10 +71,38 @@ export class ProductsController {
   @ApiQuery({ name: 'search', required: false, description: 'Search by product name' })
   @ApiQuery({ name: 'page', required: false, example: 1, description: 'Page number (1-based)' })
   @ApiQuery({ name: 'limit', required: false, example: 20, description: 'Items per page (max 100)' })
+  @ApiQuery({ name: 'archived', required: false, example: false, description: 'true — archived products only (default: active only)' })
+  @ApiQuery({ name: 'days', required: false, example: 30, description: 'Rolling metrics window in days; overrides period' })
   async findAll(@Query() query: QueryProductDto, @CurrentUser() user: JwtPayload): Promise<PaginatedResult<unknown>> {
     const result = await this.productsService.findAll(query, user.marketId)
     // Закупочная цена — данные владельца: продавец видит каталог без неё.
     return user.role === Role.SELLER ? stripCostPrice(result) : result
+  }
+
+  // Статические маршруты (summary) обязаны стоять раньше :id — иначе
+  // ParseUUIDPipe попытается разобрать слово «summary» как идентификатор.
+  @Get('summary')
+  @Roles(Role.ADMIN, Role.OWNER)
+  @ApiOperation({
+    summary: 'Stock summary for the products screen header',
+    description:
+      'Active/archived counts, out-of-stock and low-stock counts, stock value at retail and at cost, potential profit and how many products have no cost price.',
+  })
+  summary(@CurrentUser() user: JwtPayload) {
+    return this.productsService.summary(user.marketId)
+  }
+
+  // Массовая смена цен: тоже статический путь, поэтому до :id.
+  @Post('bulk-price')
+  @Roles(Role.ADMIN, Role.OWNER)
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Change prices of many products by a percentage',
+    description:
+      'Applies +/−N% to the price of all active products (optionally one category) and rounds to a step. Use dryRun=true first to preview. Cost price and past receipts are not touched.',
+  })
+  bulkPrice(@Body() dto: BulkPriceDto, @CurrentUser() user: JwtPayload) {
+    return this.productsService.bulkPrice(dto, user.marketId)
   }
 
   @Get(':id')
@@ -90,7 +122,7 @@ export class ProductsController {
   @Patch(':id')
   @Roles(Role.ADMIN, Role.OWNER)
   @UploadImage()
-  @ApiOperation({ summary: 'Update a product', description: 'Updates a product with partial data and an optional new image.' })
+  @ApiOperation({ summary: 'Update a product', description: 'Updates a product with partial data and an optional new image. Stock is NOT editable here: use restock, write-off or adjust.' })
   @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Product ID' })
   @ApiBody({
     description: 'Product update payload (multipart/form-data). Send a new image to replace the existing one, or omit to keep it.',
@@ -100,7 +132,6 @@ export class ProductsController {
         name: { type: 'string', example: 'Apple', description: 'Product name (2-200 chars)' },
         description: { type: 'string', example: 'Fresh red apples', description: 'Product description (max 1000 chars)' },
         price: { type: 'number', example: 1.5, description: 'Product price (min 0.01)' },
-        quantity: { type: 'number', example: 100, description: 'Available quantity (min 0)' },
         image: { type: 'string', format: 'binary', description: 'New product image (replaces existing). Omit to keep current.' },
       },
     },
@@ -133,12 +164,87 @@ export class ProductsController {
     @Body() dto: RestockProductDto,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.productsService.restock(id, dto, user.marketId)
+    return this.productsService.restock(id, dto, user.marketId, user.sub)
+  }
+
+  @Post(':id/write-off')
+  @Roles(Role.ADMIN, Role.OWNER)
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Write stock off (damaged, expired, lost, own use)',
+    description: 'Removes units from stock atomically with a mandatory reason. Cannot take the stock below zero.',
+  })
+  @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Product ID' })
+  @ApiBody({ type: WriteOffProductDto })
+  @ApiOkResponse({ type: ProductResponseDto, description: 'The product with the updated stock' })
+  writeOff(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: WriteOffProductDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.productsService.writeOff(id, dto, user.marketId, user.sub)
+  }
+
+  @Post(':id/adjust')
+  @Roles(Role.ADMIN, Role.OWNER)
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Stock count (inventory): set the counted total',
+    description:
+      'Sets stock to the counted number; the difference is recorded as an ADJUSTMENT. Answers 409 PRODUCT_STOCK_CHANGED if sales happened while counting.',
+  })
+  @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Product ID' })
+  @ApiBody({ type: AdjustStockDto })
+  @ApiOkResponse({ type: ProductResponseDto, description: 'The product with the updated stock' })
+  adjust(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AdjustStockDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.productsService.adjust(id, dto, user.marketId, user.sub)
+  }
+
+  @Get(':id/movements')
+  @Roles(Role.ADMIN, Role.OWNER)
+  @ApiOperation({
+    summary: 'Stock history of a product',
+    description: 'Paginated journal of every stock change (sale, refund, restock, write-off, count), newest first, with balance after each.',
+  })
+  @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Product ID' })
+  movements(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: QueryMovementsDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.productsService.findMovements(id, query, user.marketId)
+  }
+
+  @Post(':id/archive')
+  @Roles(Role.ADMIN, Role.OWNER)
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Archive a product',
+    description: 'Hides the product from the catalog and from sales. History and receipts stay intact. Reversible.',
+  })
+  @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Product ID' })
+  @ApiOkResponse({ type: ProductResponseDto })
+  archive(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+    return this.productsService.setArchived(id, true, user.marketId)
+  }
+
+  @Post(':id/unarchive')
+  @Roles(Role.ADMIN, Role.OWNER)
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Restore a product from the archive' })
+  @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Product ID' })
+  @ApiOkResponse({ type: ProductResponseDto })
+  unarchive(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+    return this.productsService.setArchived(id, false, user.marketId)
   }
 
   @Delete(':id')
   @Roles(Role.ADMIN, Role.OWNER)
-  @ApiOperation({ summary: 'Delete a product', description: 'Deletes a product and its associated image.' })
+  @ApiOperation({ summary: 'Delete a product', description: 'Deletes a product that has no sales history (its stock journal goes with it). With history answers 409 PRODUCT_HAS_TRANSACTIONS — archive it instead.' })
   @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Product ID' })
   @ApiOkResponse({ description: 'Product successfully deleted' })
   remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {

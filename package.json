@@ -13,6 +13,7 @@
 		"prisma:deploy": "prisma migrate deploy",
 		"prisma:studio": "prisma studio",
 		"prisma:seed": "ts-node prisma/seed.ts",
+		"db:stock-movements": "prisma db execute --file prisma/sql/20261029_stock_movements.sql",
 		"test": "jest",
 		"test:watch": "jest --watch",
 		"test:cov": "jest --coverage"
