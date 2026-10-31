@@ -1,5 +1,5 @@
 import { PrismaPg } from '@prisma/adapter-pg'
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 import { hash } from 'bcrypt'
 import 'dotenv/config'
 import {
@@ -57,6 +57,7 @@ const DEAD_STOCK_INDEX = 10
 const NO_COST_INDEXES = [7, 19]
 
 async function clearTables() {
+	await prisma.stockMovement.deleteMany()
 	await prisma.sellerCredit.deleteMany()
 	await prisma.payment.deleteMany()
 	await prisma.transactionItem.deleteMany()
@@ -551,6 +552,8 @@ interface RefundResult {
 	/** productId → сколько единиц вернулось на склад. */
 	restocked: Map<string, number>
 	refundCount: number
+	/** Движения «возврат на склад» для журнала остатков. */
+	events: StockEvent[]
 }
 
 interface RefundPlan {
@@ -600,6 +603,7 @@ async function createRefunds(
 	const restocked = new Map<string, number>()
 	const refundedByItem = new Map<string, number>() // dbItemId → возвращено
 	const touched = new Set<string>()
+	const events: StockEvent[] = []
 	let refundCount = 0
 
 	for (const plan of REFUND_PLANS) {
@@ -646,7 +650,10 @@ async function createRefunds(
 			)
 		}
 
-		await prisma.transaction.create({
+		const refundedAt = new Date(
+			Math.min(sale.createdAt.getTime() + plan.daysAfter * DAY, NOW - MINUTE)
+		)
+		const refundTx = await prisma.transaction.create({
 			data: {
 				marketId,
 				createdById: owner.id,
@@ -659,12 +666,20 @@ async function createRefunds(
 				markupAmount: round2(lines.reduce((s, l) => s + l.data.markup, 0)),
 				remainingAmount: 0,
 				status: 'PAID',
-				createdAt: new Date(
-					Math.min(sale.createdAt.getTime() + plan.daysAfter * DAY, NOW - MINUTE)
-				),
+				createdAt: refundedAt,
 				items: { create: lines.map(l => l.data) }
 			}
 		})
+		for (const l of lines) {
+			events.push({
+				productId: l.data.productId,
+				at: refundedAt,
+				type: 'REFUND',
+				delta: l.quantity,
+				transactionId: refundTx.id,
+				createdById: owner.id
+			})
+		}
 		touched.add(sale.id)
 		refundCount++
 	}
@@ -679,7 +694,7 @@ async function createRefunds(
 		})
 	}
 
-	return { restocked, refundCount }
+	return { restocked, refundCount, events }
 }
 
 /**
@@ -691,8 +706,10 @@ async function createRefunds(
 async function syncStock(
 	products: SeedProduct[],
 	txs: CreatedTx[],
-	restocked: Map<string, number>
-) {
+	restocked: Map<string, number>,
+	manual: Map<string, number>
+): Promise<Map<string, number>> {
+	const finalQuantity = new Map<string, number>()
 	const sold = new Map<string, number>()
 	for (const tx of txs) {
 		for (const item of tx.items) {
@@ -705,12 +722,15 @@ async function syncStock(
 			0,
 			product.initialQuantity -
 				(sold.get(product.id) ?? 0) +
-				(restocked.get(product.id) ?? 0)
+				(restocked.get(product.id) ?? 0) +
+				(manual.get(product.id) ?? 0)
 		)
 		if (i === 1) quantity = 4
 		if (i === 6) quantity = 2
 		await prisma.product.update({ where: { id: product.id }, data: { quantity } })
+		finalQuantity.set(product.id, quantity)
 	}
+	return finalQuantity
 }
 
 /**
@@ -749,6 +769,157 @@ async function createSellerCredits(
 	}
 }
 
+type StockEventType = 'SALE' | 'REFUND' | 'RESTOCK' | 'WRITE_OFF' | 'ADJUSTMENT' | 'VOID'
+
+/** Событие склада до расчёта остатков: balanceAfter считается при записи. */
+interface StockEvent {
+	productId: string
+	at: Date
+	type: StockEventType
+	delta: number
+	transactionId?: string | null
+	createdById: string
+	reason?: string
+	note?: string
+}
+
+/**
+ * Ручные движения, которых нет в чеках: поставки, списания и одна отменённая
+ * продажа (SALE + VOID без чека — так выглядит удалённый чек в журнале).
+ * Индексы товаров — как в DEAD_STOCK_INDEX / планах продаж; отсутствующий
+ * индекс (в маленьком каталоге) пропускается.
+ */
+function buildManualStockEvents(products: SeedProduct[], owner: Owner): StockEvent[] {
+	const at = (days: number, minutes = 0) => ago(days, minutes)
+	const restock = (i: number, qty: number, days: number, note: string): StockEvent[] =>
+		products[i]
+			? [{ productId: products[i].id, at: at(days, 90), type: 'RESTOCK', delta: qty, createdById: owner.id, note }]
+			: []
+	const writeOff = (i: number, qty: number, days: number, reason: string, note?: string): StockEvent[] =>
+		products[i]
+			? [{ productId: products[i].id, at: at(days, 45), type: 'WRITE_OFF', delta: -qty, createdById: owner.id, reason, note }]
+			: []
+
+	const voided: StockEvent[] = products[4]
+		? [
+				{ productId: products[4].id, at: at(2, 30), type: 'SALE', delta: -2, createdById: owner.id, note: 'Чек удалён: ошибка оформления' },
+				{ productId: products[4].id, at: at(2, 20), type: 'VOID', delta: 2, createdById: owner.id, note: 'Отмена чека' }
+			]
+		: []
+
+	return [
+		...restock(0, 30, 20, 'Поставка'),
+		...restock(0, 20, 5, 'Докупили к выходным'),
+		...restock(3, 40, 9, 'Поставка от постоянного поставщика'),
+		...restock(8, 25, 2, 'Поставка'),
+		...writeOff(2, 2, 12, 'DAMAGED', 'Повреждена упаковка'),
+		...writeOff(5, 3, 8, 'EXPIRED'),
+		...writeOff(9, 1, 3, 'LOST'),
+		...writeOff(13, 1, 1, 'OWN_USE', 'Взял для себя'),
+		...voided
+	]
+}
+
+/**
+ * Журнал остатков. Для каждого товара события сортируются по времени, а
+ * начальный остаток подбирается так, чтобы цепочка ни разу не ушла в минус.
+ * Если цепочка не сходится с итоговым остатком товара (его задают сценарии
+ * «заканчивается»), разницу закрывает инвентаризационная корректировка —
+ * ровно так, как это выглядит у живого владельца. В итоге у КАЖДОГО товара
+ * Σ delta = quantity; это проверяется после записи.
+ */
+async function writeStockJournal(
+	marketId: string,
+	owner: Owner,
+	products: SeedProduct[],
+	events: StockEvent[],
+	finalQuantity: Map<string, number>
+) {
+	const rows: Prisma.StockMovementCreateManyInput[] = []
+
+	for (const product of products) {
+		const own = events
+			.filter(e => e.productId === product.id)
+			.sort((a, b) => a.at.getTime() - b.at.getTime())
+
+		let running = 0
+		let lowest = 0
+		for (const e of own) {
+			running += e.delta
+			lowest = Math.min(lowest, running)
+		}
+		const opening = -lowest
+		const target = finalQuantity.get(product.id) ?? 0
+		const chain = [...own]
+		if (opening + running !== target) {
+			chain.push({
+				productId: product.id,
+				at: ago(1, 30),
+				type: 'ADJUSTMENT',
+				delta: target - (opening + running),
+				createdById: owner.id,
+				note: 'Инвентаризация: пересчитали на полке'
+			})
+		}
+
+		let balance = 0
+		if (opening > 0) {
+			balance = opening
+			rows.push({
+				productId: product.id,
+				marketId,
+				type: 'OPENING',
+				delta: opening,
+				balanceAfter: balance,
+				note: 'Начальный остаток',
+				createdAt: ago(400)
+			})
+		}
+		for (const e of chain) {
+			balance += e.delta
+			rows.push({
+				productId: product.id,
+				marketId,
+				type: e.type,
+				delta: e.delta,
+				balanceAfter: balance,
+				reason: e.reason ?? null,
+				note: e.note ?? null,
+				transactionId: e.transactionId ?? null,
+				createdById: e.createdById,
+				createdAt: e.at
+			})
+		}
+	}
+
+	await prisma.stockMovement.createMany({ data: rows })
+
+	const broken = await prisma.$queryRaw<{ name: string }[]>`
+		SELECT p."name"
+		FROM "Product" p
+		LEFT JOIN "StockMovement" m ON m."productId" = p."id"
+		WHERE p."marketId" = ${marketId}
+		GROUP BY p."id", p."name", p."quantity"
+		HAVING COALESCE(SUM(m."delta"), 0) <> p."quantity"
+	`
+	if (broken.length > 0) {
+		throw new Error(
+			`Журнал остатков не сходится с quantity у товаров: ${broken.map(b => b.name).join(', ')}`
+		)
+	}
+	return rows.length
+}
+
+/** Архивный товар: снят с продажи, но чеки на него остались. */
+async function archiveOne(products: SeedProduct[]) {
+	const target = products[23] ?? products[products.length - 1]
+	await prisma.product.update({
+		where: { id: target.id },
+		data: { isActive: false, archivedAt: ago(10) }
+	})
+	return target.name
+}
+
 async function seedMarket(
 	label: string,
 	users: MarketUsers,
@@ -767,12 +938,47 @@ async function seedMarket(
 	const debts = await createDebts(marketId, products, debtors, users.sellers, users.owner)
 	console.log(`  ✓ ${label}: продаж ${sales.length}, долгов ${debts.length}`)
 
-	const { restocked, refundCount } = await createRefunds(marketId, sales, users.owner)
+	const { restocked, refundCount, events: refundEvents } = await createRefunds(
+		marketId,
+		sales,
+		users.owner
+	)
 	console.log(`  ✓ ${label}: возвратов ${refundCount}`)
 
-	await syncStock(products, [...sales, ...debts], restocked)
+	const manualEvents = buildManualStockEvents(products, users.owner)
+	const manualDelta = new Map<string, number>()
+	for (const e of manualEvents) {
+		manualDelta.set(e.productId, (manualDelta.get(e.productId) ?? 0) + e.delta)
+	}
+	const finalQuantity = await syncStock(
+		products,
+		[...sales, ...debts],
+		restocked,
+		manualDelta
+	)
 	await createSellerCredits([...sales, ...debts], users.sellers, users.owner)
 	console.log(`  ✓ ${label}: остатки и выплаты продавцам`)
+
+	// Журнал: продажи и долги списывают, возвраты возвращают, плюс ручные движения.
+	const saleEvents: StockEvent[] = [...sales, ...debts].flatMap(tx =>
+		tx.items.map(item => ({
+			productId: item.productId,
+			at: tx.createdAt,
+			type: 'SALE' as const,
+			delta: -item.quantity,
+			transactionId: tx.id,
+			createdById: tx.createdById
+		}))
+	)
+	const movements = await writeStockJournal(
+		marketId,
+		users.owner,
+		products,
+		[...saleEvents, ...refundEvents, ...manualEvents],
+		finalQuantity
+	)
+	const archived = await archiveOne(products)
+	console.log(`  ✓ ${label}: журнал остатков ${movements} движений (сходится с остатками), в архиве «${archived}»`)
 }
 
 async function main() {

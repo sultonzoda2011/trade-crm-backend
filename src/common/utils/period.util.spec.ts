@@ -1,5 +1,5 @@
 import { AnalyticsPeriod } from '../dto/period-query.dto'
-import { buildComparison, resolvePeriod, round2 } from './period.util'
+import { buildComparison, MS_PER_DAY, resolvePeriod, resolveRollingWindow, round2 } from './period.util'
 
 describe('resolvePeriod', () => {
 	// Середина месяца и середина недели — так видно, что окна не «доезжают»
@@ -113,4 +113,23 @@ describe('round2', () => {
 		expect(round2(10.005)).toBe(10.01)
 		expect(round2(0.1 + 0.2)).toBe(0.3)
 	})
+})
+
+describe('resolveRollingWindow', () => {
+  const now = new Date('2026-10-01T12:00:00.000Z')
+
+  it('always has the requested length, even on the 1st of the month', () => {
+    const window = resolveRollingWindow(30, now)
+
+    expect(window.durationDays).toBe(30)
+    expect(window.current.lte).toEqual(now)
+    expect(now.getTime() - window.current.gte.getTime()).toBe(30 * MS_PER_DAY)
+  })
+
+  it('puts the previous window right before the current one with the same length', () => {
+    const { current, previous } = resolveRollingWindow(7, now)
+
+    expect(previous.lte.getTime()).toBe(current.gte.getTime() - 1)
+    expect(previous.lte.getTime() - previous.gte.getTime()).toBe(7 * MS_PER_DAY)
+  })
 })

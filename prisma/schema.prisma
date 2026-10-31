@@ -22,6 +22,7 @@ model User {
   market        Market?        @relation(fields: [marketId], references: [id])
   creditsReceived SellerCredit[] @relation("SellerCredits")
   creditsGiven    SellerCredit[] @relation("CreditsGivenBy")
+  stockMovements  StockMovement[]
 
   @@index([marketId])
 }
@@ -42,6 +43,7 @@ model Market {
   products     Product[]
   transactions Transaction[]
   users        User[]
+  stockMovements StockMovement[]
 }
 
 model Category {
@@ -75,12 +77,19 @@ model Product {
   // и для них прибыль не считается. Меняется только вручную в карточке товара.
   costPrice         Float?
   unit              ProductUnit       @default(PCS)
+  // Архив вместо удаления: товар с историей продаж удалить нельзя (чеки на него
+  // ссылаются), но продавать его больше не нужно. Архивный товар не попадает в
+  // каталог по умолчанию, в продажу и в аналитику склада; чеки и журнал целы.
+  isActive          Boolean           @default(true)
+  archivedAt        DateTime?
   category          Category?         @relation(fields: [categoryId], references: [id])
   market            Market            @relation(fields: [marketId], references: [id])
   transactionItems  TransactionItem[]
+  stockMovements    StockMovement[]
 
   @@index([marketId])
   @@index([categoryId])
+  @@index([marketId, isActive])
 }
 
 model Debtor {
@@ -139,6 +148,7 @@ model Transaction {
   refundOf        Transaction?      @relation("TransactionRefund", fields: [refundOfId], references: [id])
   refunds         Transaction[]     @relation("TransactionRefund")
   items           TransactionItem[]
+  stockMovements  StockMovement[]
 
   @@index([marketId])
   @@index([debtorId])
@@ -180,6 +190,37 @@ model TransactionItem {
   @@index([transactionId])
   @@index([productId])
   @@index([refundOfItemId])
+}
+
+// Журнал движения остатка. Product.quantity остаётся быстрым «текущим числом»,
+// но меняется только вместе с записью здесь: Σ delta по товару всегда равна его
+// остатку (на момент включения журнала остаток записан как OPENING).
+// Строки не редактируются и не удаляются; при удалении чека ссылка на него
+// обнуляется, а сама запись остаётся (см. VOID).
+model StockMovement {
+  id            String            @id @default(uuid())
+  productId     String
+  marketId      String
+  type          StockMovementType
+  // Со знаком: приход > 0, расход < 0.
+  delta         Int
+  // Остаток товара сразу после этого движения — чтобы историю можно было
+  // показать без пересчёта всей цепочки.
+  balanceAfter  Int
+  // Для WRITE_OFF — код причины (DAMAGED, EXPIRED, LOST, OWN_USE, OTHER).
+  reason        String?
+  note          String?
+  transactionId String?
+  createdById   String?
+  createdAt     DateTime          @default(now())
+  product       Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  market        Market            @relation(fields: [marketId], references: [id])
+  transaction   Transaction?      @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  createdBy     User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([productId, createdAt])
+  @@index([marketId, createdAt])
+  @@index([transactionId])
 }
 
 model Payment {
@@ -248,6 +289,16 @@ enum TransactionStatus {
   PARTIAL
   REFUNDED
   PARTIALLY_REFUNDED
+}
+
+enum StockMovementType {
+  OPENING
+  RESTOCK
+  SALE
+  REFUND
+  VOID
+  WRITE_OFF
+  ADJUSTMENT
 }
 
 enum ProductUnit {

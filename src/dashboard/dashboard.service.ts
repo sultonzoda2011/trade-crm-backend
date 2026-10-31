@@ -377,7 +377,10 @@ export class DashboardService {
 		period: ReturnType<typeof resolvePeriod>,
 		marketId?: string
 	) {
-		const where: Prisma.ProductWhereInput = marketId ? { marketId } : {}
+		// Архивные товары сняты с продажи: в «закончилось» и «что заказать» им не место.
+		const where: Prisma.ProductWhereInput = marketId
+			? { marketId, isActive: true }
+			: { isActive: true }
 
 		const products = await this.prisma.product.findMany({
 			where,

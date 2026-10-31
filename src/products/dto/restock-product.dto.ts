@@ -1,13 +1,9 @@
-import { ApiProperty } from '@nestjs/swagger'
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
-import { IsInt, Max, Min } from 'class-validator'
+import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator'
+import { MAX_STOCK } from '../stock.util'
 
-/**
- * Потолок и для одного пополнения, и для остатка после него. `Product.quantity`
- * — Int (до ~2.1 млрд), так что запас по переполнению остаётся с большим
- * зазором, а опечатка вроде лишних нулей отсекается сразу.
- */
-export const MAX_STOCK = 1_000_000_000
+export { MAX_STOCK }
 
 export class RestockProductDto {
 	@ApiProperty({
@@ -19,4 +15,13 @@ export class RestockProductDto {
 	@Min(1)
 	@Max(MAX_STOCK)
 	quantity: number
+
+	@ApiPropertyOptional({
+		example: 'Поставка от Азиз-ака',
+		description: 'Optional note shown in the stock history (max 200 chars)'
+	})
+	@IsOptional()
+	@IsString()
+	@MaxLength(200)
+	note?: string
 }

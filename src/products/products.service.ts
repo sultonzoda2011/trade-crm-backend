@@ -1,10 +1,11 @@
 import {
+	BadRequestException,
 	ConflictException,
 	Injectable,
 	NotFoundException,
 	UnauthorizedException
 } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
+import { Prisma, StockMovementType } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../common/services/storage.service'
 import {
@@ -14,7 +15,11 @@ import {
 } from '../analytics/analytics.service'
 import { PaginatedResult } from '../common/dto/pagination.dto'
 import { AnalyticsPeriod } from '../common/dto/period-query.dto'
-import { buildComparison, resolvePeriod } from '../common/utils/period.util'
+import {
+	buildComparison,
+	resolvePeriod,
+	resolveRollingWindow
+} from '../common/utils/period.util'
 import {
 	buildDateWhere,
 	buildOrderBy,
@@ -22,8 +27,13 @@ import {
 } from '../common/utils/paginate.util'
 import { CreateProductDto } from './dto/create-product.dto'
 import { QueryProductDto } from './dto/query-product.dto'
-import { MAX_STOCK, RestockProductDto } from './dto/restock-product.dto'
+import { RestockProductDto } from './dto/restock-product.dto'
 import { UpdateProductDto } from './dto/update-product.dto'
+import { WriteOffProductDto } from './dto/write-off-product.dto'
+import { AdjustStockDto } from './dto/adjust-stock.dto'
+import { BulkPriceDto } from './dto/bulk-price.dto'
+import { QueryMovementsDto } from './dto/query-movements.dto'
+import { logMovement, MAX_STOCK, moveStock } from './stock.util'
 import { Express } from 'express'
 
 const productInclude = {
@@ -77,17 +87,47 @@ export class ProductsService {
 	async create(
 		dto: CreateProductDto,
 		file: Express.Multer.File,
-		marketId?: string
+		marketId?: string,
+		userId?: string
 	) {
 		if (!marketId)
 			throw new UnauthorizedException('User is not assigned to a market')
 		const image = file
 			? await this.storageService.save(file, 'products')
 			: undefined
-		return this.prisma.product.create({
-			data: { ...dto, image, marketId },
-			include: productInclude
+		return this.prisma.$transaction(async tx => {
+			const product = await tx.product.create({
+				data: { ...dto, image, marketId },
+				include: productInclude
+			})
+			// Журнал начинается с начального остатка: иначе Σ движений не сходилась
+			// бы с quantity с первого же дня.
+			if (product.quantity > 0) {
+				await logMovement(
+					tx,
+					{
+						productId: product.id,
+						marketId,
+						type: StockMovementType.OPENING,
+						delta: product.quantity,
+						note: 'Начальный остаток',
+						createdById: userId
+					},
+					product.quantity
+				)
+			}
+			return product
 		})
+	}
+
+	/**
+	 * Окно метрик: скользящие `days` дней, если переданы, иначе календарный
+	 * `period` (по умолчанию — текущий месяц).
+	 */
+	private resolveWindow(query: { days?: number; period?: AnalyticsPeriod }) {
+		return query.days
+			? resolveRollingWindow(query.days)
+			: resolvePeriod({ period: query.period })
 	}
 
 	/**
@@ -117,7 +157,7 @@ export class ProductsService {
 		}
 
 		const page = await this.findAllFromDatabase(query, userMarketId)
-		const { current, durationDays } = resolvePeriod({ period: query.period })
+		const { current, durationDays } = this.resolveWindow(query)
 		const products = page.data as ProductRecord[]
 
 		const sales = await this.analytics.getProductSalesRows(
@@ -149,7 +189,7 @@ export class ProductsService {
 		query: QueryProductDto,
 		userMarketId?: string
 	): Promise<PaginatedResult<unknown>> {
-		const where: Prisma.ProductWhereInput = {}
+		const where: Prisma.ProductWhereInput = { isActive: !query.archived }
 		if (userMarketId) where.marketId = userMarketId
 		if (query.categoryId) where.categoryId = query.categoryId
 		if (query.search) {
@@ -167,7 +207,7 @@ export class ProductsService {
 				include: productInclude,
 				take: ANALYTICS_CATALOG_LIMIT
 			}),
-			Promise.resolve(resolvePeriod({ period: query.period }))
+			Promise.resolve(this.resolveWindow(query))
 		])
 
 		const sales = await this.analytics.getProductSalesRows(current, userMarketId)
@@ -247,7 +287,8 @@ export class ProductsService {
 		query: QueryProductDto,
 		userMarketId?: string
 	): Promise<PaginatedResult<unknown>> {
-		const where: Prisma.ProductWhereInput = {}
+		// Архив — отдельный режим списка: по умолчанию его нет в каталоге.
+		const where: Prisma.ProductWhereInput = { isActive: !query.archived }
 
 		if (userMarketId) where.marketId = userMarketId
 		if (query.categoryId) where.categoryId = query.categoryId
@@ -267,7 +308,8 @@ export class ProductsService {
 			// затем подгружаем полные записи через findMany — так сохраняем include
 			// и не тащим весь каталог в память.
 			const conditions: Prisma.Sql[] = [
-				Prisma.sql`p.quantity <= p."lowStockThreshold"`
+				Prisma.sql`p.quantity <= p."lowStockThreshold"`,
+				Prisma.sql`p."isActive" = ${!query.archived}`
 			]
 			if (userMarketId) conditions.push(Prisma.sql`p."marketId" = ${userMarketId}`)
 			if (query.categoryId) conditions.push(Prisma.sql`p."categoryId" = ${query.categoryId}`)
@@ -331,9 +373,17 @@ export class ProductsService {
 		)
 	}
 
-	async findOne(id: string, userMarketId?: string, period?: AnalyticsPeriod) {
+	async findOne(
+		id: string,
+		userMarketId?: string,
+		period?: AnalyticsPeriod,
+		days?: number
+	) {
 		const product = await this.getProductOrThrow(id, userMarketId)
-		const { current, previous, durationDays } = resolvePeriod({ period })
+		const { current, previous, durationDays } = this.resolveWindow({
+			period,
+			days
+		})
 
 		// sales — статистика за всё время (используется на карточке товара),
 		// metrics — метрики за период, на которых строятся рекомендации.
@@ -445,20 +495,37 @@ export class ProductsService {
 	/**
 	 * Пополнение остатка: `quantity` прибавляется к текущему значению прямо в БД.
 	 *
-	 * Это не то же самое, что PATCH с новым количеством: форма правки записывает
-	 * число, которое человек видел на экране, и затирает продажи, прошедшие за
-	 * это время. Здесь инкремент считает сама БД, поэтому параллельные продажи
-	 * и пополнения не теряются — тот же приём, что у списания в transactions.
+	 * Это не то же самое, что запись нового итога: число, которое человек видел на
+	 * экране, затёрло бы продажи, прошедшие за это время. Здесь инкремент считает
+	 * сама БД, поэтому параллельные продажи и пополнения не теряются.
 	 */
-	async restock(id: string, dto: RestockProductDto, userMarketId?: string) {
-		await this.getProductOrThrow(id, userMarketId)
+	async restock(
+		id: string,
+		dto: RestockProductDto,
+		userMarketId?: string,
+		userId?: string
+	) {
+		const product = await this.getProductOrThrow(id, userMarketId)
 
-		const { count } = await this.prisma.product.updateMany({
-			where: { id, quantity: { lte: MAX_STOCK - dto.quantity } },
-			data: { quantity: { increment: dto.quantity } }
+		const ok = await this.prisma.$transaction(async tx => {
+			const balance = await moveStock(tx, id, dto.quantity)
+			if (balance === null) return false
+			await logMovement(
+				tx,
+				{
+					productId: id,
+					marketId: product.marketId,
+					type: StockMovementType.RESTOCK,
+					delta: dto.quantity,
+					note: dto.note,
+					createdById: userId
+				},
+				balance
+			)
+			return true
 		})
 
-		if (count === 0) {
+		if (!ok) {
 			// Товар могли удалить между проверкой и обновлением — это 404, а не «лимит».
 			await this.getProductOrThrow(id, userMarketId)
 			throw new ConflictException({
@@ -469,6 +536,244 @@ export class ProductsService {
 		}
 
 		return this.getProductOrThrow(id, userMarketId)
+	}
+
+	/**
+	 * Списание: брак, просрочка, потеря, личное использование. Остаток уменьшается
+	 * атомарно и не может уйти ниже нуля; причина обязательна и попадает в журнал.
+	 */
+	async writeOff(
+		id: string,
+		dto: WriteOffProductDto,
+		userMarketId?: string,
+		userId?: string
+	) {
+		const product = await this.getProductOrThrow(id, userMarketId)
+
+		const ok = await this.prisma.$transaction(async tx => {
+			const balance = await moveStock(tx, id, -dto.quantity)
+			if (balance === null) return false
+			await logMovement(
+				tx,
+				{
+					productId: id,
+					marketId: product.marketId,
+					type: StockMovementType.WRITE_OFF,
+					delta: -dto.quantity,
+					reason: dto.reason,
+					note: dto.note,
+					createdById: userId
+				},
+				balance
+			)
+			return true
+		})
+
+		if (!ok) {
+			const fresh = await this.getProductOrThrow(id, userMarketId)
+			throw new BadRequestException({
+				message: `Cannot write off ${dto.quantity}: only ${fresh.quantity} in stock`,
+				code: 'PRODUCT_NOT_ENOUGH_STOCK',
+				details: { available: fresh.quantity }
+			})
+		}
+
+		return this.getProductOrThrow(id, userMarketId)
+	}
+
+	/**
+	 * Инвентаризация: остаток задаётся ИТОГОМ (сколько насчитали), разница с
+	 * учётным числом пишется в журнал как ADJUSTMENT. Запись условная — только
+	 * если остаток не менялся с момента чтения: иначе продажа, прошедшая во время
+	 * подсчёта, была бы затёрта, и человеку надо пересчитать с актуальным числом.
+	 */
+	async adjust(
+		id: string,
+		dto: AdjustStockDto,
+		userMarketId?: string,
+		userId?: string
+	) {
+		const product = await this.getProductOrThrow(id, userMarketId)
+		const delta = dto.quantity - product.quantity
+		if (delta === 0) return product
+
+		const ok = await this.prisma.$transaction(async tx => {
+			const { count } = await tx.product.updateMany({
+				where: { id, quantity: product.quantity },
+				data: { quantity: dto.quantity }
+			})
+			if (count === 0) return false
+			await logMovement(
+				tx,
+				{
+					productId: id,
+					marketId: product.marketId,
+					type: StockMovementType.ADJUSTMENT,
+					delta,
+					note: dto.note,
+					createdById: userId
+				},
+				dto.quantity
+			)
+			return true
+		})
+
+		if (!ok) {
+			const fresh = await this.getProductOrThrow(id, userMarketId)
+			throw new ConflictException({
+				message: 'Stock changed while you were counting, please recount',
+				code: 'PRODUCT_STOCK_CHANGED',
+				details: { currentQuantity: fresh.quantity }
+			})
+		}
+
+		return this.getProductOrThrow(id, userMarketId)
+	}
+
+	/** История движений товара, новые сверху. */
+	async findMovements(
+		id: string,
+		query: QueryMovementsDto,
+		userMarketId?: string
+	): Promise<PaginatedResult<unknown>> {
+		await this.getProductOrThrow(id, userMarketId)
+
+		const where: Prisma.StockMovementWhereInput = { productId: id }
+		if (query.type) where.type = query.type
+		if (query.dateFrom || query.dateTo)
+			where.createdAt = buildDateWhere(query.dateFrom, query.dateTo)
+
+		return paginate(
+			query,
+			({ skip, take }) =>
+				this.prisma.stockMovement.findMany({
+					where,
+					orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+					include: {
+						createdBy: { select: { id: true, name: true } },
+						transaction: { select: { id: true, type: true } }
+					},
+					skip,
+					take
+				}),
+			() => this.prisma.stockMovement.count({ where })
+		)
+	}
+
+	/**
+	 * Архив вместо удаления. Идемпотентно: повторное «в архив» не меняет archivedAt.
+	 */
+	async setArchived(id: string, archived: boolean, userMarketId?: string) {
+		const product = await this.getProductOrThrow(id, userMarketId)
+		if (product.isActive === !archived) return product
+
+		return this.prisma.product.update({
+			where: { id },
+			data: { isActive: !archived, archivedAt: archived ? new Date() : null },
+			include: productInclude
+		})
+	}
+
+	/**
+	 * Сводка склада для шапки раздела — одним агрегатом, без выгрузки каталога.
+	 * Учитывает только активные товары. «Без закупочной» нужен, чтобы интерфейс
+	 * не выдавал частичную прибыль за полную.
+	 */
+	async summary(userMarketId?: string) {
+		const market = userMarketId
+			? Prisma.sql`AND p."marketId" = ${userMarketId}`
+			: Prisma.empty
+
+		const [row] = await this.prisma.$queryRaw<
+			{
+				activeProducts: number
+				archivedProducts: number
+				outOfStock: number
+				lowStock: number
+				stockRetailValue: number
+				stockCostValue: number
+				potentialProfit: number
+				productsWithoutCost: number
+			}[]
+		>`
+			SELECT
+				COUNT(*) FILTER (WHERE p."isActive")::int AS "activeProducts",
+				COUNT(*) FILTER (WHERE NOT p."isActive")::int AS "archivedProducts",
+				COUNT(*) FILTER (WHERE p."isActive" AND p."quantity" = 0)::int AS "outOfStock",
+				COUNT(*) FILTER (
+					WHERE p."isActive" AND p."quantity" > 0
+						AND p."quantity" <= p."lowStockThreshold"
+				)::int AS "lowStock",
+				COALESCE(SUM(p."price" * p."quantity") FILTER (WHERE p."isActive"), 0)::float AS "stockRetailValue",
+				COALESCE(SUM(p."costPrice" * p."quantity") FILTER (
+					WHERE p."isActive" AND p."costPrice" IS NOT NULL
+				), 0)::float AS "stockCostValue",
+				COALESCE(SUM((p."price" - p."costPrice") * p."quantity") FILTER (
+					WHERE p."isActive" AND p."costPrice" IS NOT NULL
+				), 0)::float AS "potentialProfit",
+				COUNT(*) FILTER (WHERE p."isActive" AND p."costPrice" IS NULL)::int AS "productsWithoutCost"
+			FROM "Product" p
+			WHERE TRUE ${market}
+		`
+		return row
+	}
+
+	/**
+	 * Массовое изменение цен на N% (опционально по категории) с округлением до
+	 * шага. Один UPDATE — атомарно. `dryRun` показывает, что изменится, и ничего
+	 * не пишет. Закупочная цена и старые чеки не затрагиваются: в строке чека
+	 * цена хранится снимком.
+	 */
+	async bulkPrice(dto: BulkPriceDto, userMarketId?: string) {
+		if (!userMarketId)
+			throw new BadRequestException(
+				'Bulk price change needs a market: sign in as the market owner'
+			)
+		if (dto.percent === 0)
+			throw new BadRequestException('percent must not be 0')
+
+		if (dto.categoryId) {
+			const category = await this.prisma.category.count({
+				where: { id: dto.categoryId, marketId: userMarketId }
+			})
+			if (category === 0) throw new NotFoundException('Category not found')
+		}
+
+		const step = dto.roundTo ?? 0.01
+		const scope = Prisma.join(
+			[
+				Prisma.sql`p."marketId" = ${userMarketId}`,
+				Prisma.sql`p."isActive" = TRUE`,
+				...(dto.categoryId
+					? [Prisma.sql`p."categoryId" = ${dto.categoryId}`]
+					: [])
+			],
+			' AND '
+		)
+		// numeric, а не float8: 0.1 + 0.2 в двоичной дроби даёт цены вроде 12.340000000000002.
+		const newPrice = Prisma.sql`GREATEST(
+			ROUND(p."price"::numeric * (1 + ${dto.percent}::numeric / 100) / ${step}::numeric) * ${step}::numeric,
+			${step}::numeric
+		)`
+
+		if (dto.dryRun) {
+			const items = await this.prisma.$queryRaw<
+				{ id: string; name: string; oldPrice: number; newPrice: number }[]
+			>`
+				SELECT p."id", p."name", p."price" AS "oldPrice", ROUND(${newPrice}, 2)::float AS "newPrice"
+				FROM "Product" p
+				WHERE ${scope} AND ROUND(${newPrice}, 2) <> ROUND(p."price"::numeric, 2)
+				ORDER BY p."name"
+			`
+			return { dryRun: true, count: items.length, items: items.slice(0, 20) }
+		}
+
+		const updated = await this.prisma.$executeRaw`
+			UPDATE "Product" p
+			SET "price" = ROUND(${newPrice}, 2)::float, "updatedAt" = NOW()
+			WHERE ${scope} AND ROUND(${newPrice}, 2) <> ROUND(p."price"::numeric, 2)
+		`
+		return { dryRun: false, count: updated, items: [] }
 	}
 
 	async remove(id: string, userMarketId?: string) {
@@ -482,7 +787,8 @@ export class ProductsService {
 			throw new ConflictException({
 				message: 'Cannot delete product with transaction history',
 				code: 'PRODUCT_HAS_TRANSACTIONS',
-				details: { transactionItemsCount }
+				// Подсказка интерфейсу: вместо «нельзя» предложить «в архив».
+				details: { transactionItemsCount, canArchive: true }
 			})
 		}
 

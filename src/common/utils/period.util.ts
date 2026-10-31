@@ -175,6 +175,29 @@ export function resolvePeriod(
   }
 }
 
+/**
+ * Скользящее окно «последние N дней» — альтернатива календарному периоду для
+ * складских метрик. Календарный «месяц» 1-го числа состоит из одного дня, и
+ * скорость продаж/запас в днях на нём — шум; N дней назад всегда даёт окно
+ * одной и той же длины.
+ */
+export function resolveRollingWindow(
+  days: number,
+  now: Date = new Date(),
+): ResolvedPeriod {
+  const durationMs = days * MS_PER_DAY
+  const current: DateRange = { gte: new Date(now.getTime() - durationMs), lte: now }
+  return {
+    current,
+    previous: {
+      gte: new Date(current.gte.getTime() - durationMs - 1),
+      lte: new Date(current.gte.getTime() - 1),
+    },
+    truncUnit: 'day',
+    durationDays: days,
+  }
+}
+
 export interface MetricComparison {
   current: number
   previous: number
