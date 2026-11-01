@@ -43,6 +43,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR
     let messages: string[] = ['Internal server error']
     let error: string | undefined
+    let code: string | undefined
+    let details: unknown
 
     if (exception instanceof HttpException) {
       status = exception.getStatus()
@@ -54,6 +56,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
         const body = res as Record<string, any>
         messages = normalizeMessage(body.message ?? exception.message)
         error = body.error
+        // Машинный код и детали (`PRODUCT_STOCK_CHANGED`, `CURRENT_PASSWORD_INCORRECT`…):
+        // без них фронт не отличит одну 400 от другой и не покажет ошибку у нужного поля.
+        if (typeof body.code === 'string') code = body.code
+        if (body.details !== undefined) details = body.details
       }
     } else if (this.isPrismaError(exception, PRISMA_FK_RESTRICT_CODE)) {
       status = HttpStatus.CONFLICT
@@ -79,6 +85,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode: status,
       message: messages,
       ...(error ? { error } : {}),
+      ...(code ? { code } : {}),
+      ...(details !== undefined ? { details } : {}),
       timestamp: new Date().toISOString(),
     })
   }

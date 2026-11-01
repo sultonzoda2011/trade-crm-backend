@@ -25,16 +25,20 @@
 - Unit tests use **jest + ts-jest** (`jest.config.js`), no DB access — Prisma is mocked.
 - `jest.config.js`: `rootDir: 'src'`, `testRegex: '.*\\.spec\\.ts$'`, `clearMocks: true`, coverage output `../coverage`.
 - Specs live next to sources as `*.spec.ts`; `tsconfig.build.json` excludes them from the build.
-- 13 spec files cover:
+- 21 spec files cover:
   - `analytics/analytics.service.spec.ts` (sales velocity, stock health, reorder priority, debtor risk, period comparisons)
+  - `auth/auth.service.spec.ts` (login finds the user case-insensitively)
+  - `auth/login-throttle.util.spec.ts` (login rate-limit bucket = IP + email)
   - `auth/strategies/jwt.strategy.spec.ts` (60s user cache & deleted-user eviction)
   - `common/interceptors/idempotency.interceptor.spec.ts` (`Idempotency-Key` deduplication & replay)
   - `common/services/throttler-storage.service.spec.ts` (Postgres rate-limit storage)
   - `common/utils/period.util.spec.ts` (UTC period window resolution & previous-period calculation)
   - `dashboard/dashboard.service.spec.ts` (stats, revenue trend, payment distribution, sub-service orchestration)
   - `debtors/debtors.service.spec.ts` (debtor CRUD, summary metrics, credit profile)
+  - `common/filters/http-exception.filter.spec.ts` (`code`/`details` of an exception reach the client)
   - `health/health.controller.spec.ts` (DB up/down probe)
   - `markets/markets.service.spec.ts` (**IDOR scoping** on update/remove)
+  - `profile/profile.service.spec.ts` (earnings only for sellers, email change needs the password, avatar upload/removal order, password-change error codes)
   - `products/products.service.spec.ts` (stock journal on create/restock/write-off/adjust, archive, bulk price, summary, market scoping)
   - `products/dto/query-product.dto.spec.ts` (`?flag=false` parsing, rolling-window range)
   - `transactions/transactions.service.spec.ts` (role restrictions, debtor IDOR, pricing/discount/markup, atomic stock decrement, full & partial refunds, stock journal SALE/REFUND/VOID, archived products)
@@ -59,6 +63,7 @@
 - `PrismaService` uses `@prisma/adapter-pg` — the adapter is constructed with the raw `DATABASE_URL` env var, not via PrismaClient's `datasources`.
 - DB config: `prisma.config.ts` (Prisma v7 config file format, not `prisma/schema.prisma` for datasource URLs).
 - Migrations: the repo has no `prisma/migrations/` yet; schema changes ship as idempotent SQL in `prisma/sql/` (run with an `npm run db:*` script) and must leave the DB identical to what `prisma db push` would create.
+- **Profile migration**: `npm run db:profile` (`prisma/sql/20261031_profile.sql`) — adds nullable `User.phone` and `User.passwordChangedAt`. Additive, safe to re-run; old backend keeps working on the new schema.
 - **Stock journal migration**: `npm run db:stock-movements` (`prisma/sql/20261029_stock_movements.sql`) — creates `StockMovement`, adds `Product.isActive/archivedAt`, backfills each non-zero stock as an `OPENING` movement. Safe to re-run; keeps all data.
 - Run `prisma generate` after any schema change (`npm run prisma:generate`), otherwise `npx tsc` will fail against stale types.
 - Models: `User, Market, Category, Product, StockMovement, Debtor, Transaction, TransactionItem, Payment, SellerCredit, ThrottleBucket, IdempotencyKey`.
@@ -106,7 +111,7 @@ All paths below are under the `/api` prefix.
 | markets | `markets` | ADMIN, OWNER | `POST /` (multipart, **ADMIN only**), `GET /`, `GET /:id`, `GET /:id/full`, `PATCH /:id` (multipart, ADMIN+OWNER), `DELETE /:id` (**ADMIN only**) |
 | sellers | `sellers` | OWNER, ADMIN | `POST /` (multipart), `GET /`, `GET /:id`, `GET /:id/full`, `PATCH /:id` (multipart), `DELETE /:id` |
 | debtors | `debtors` | none (SELLER allowed) | `POST /` (`@Idempotent()`), `GET /`, `GET /:id`, `GET /:id/full`, `PATCH /:id`, `DELETE /:id` (**ADMIN+OWNER**) |
-| profile | `profile` | none (any authed user) | `GET /`, `PATCH /` (multipart), `PATCH /password` |
+| profile | `profile` | none (any authed user) | `GET /`, `GET /full` (profile + market + `earnings` for sellers), `GET /earnings` (**SELLER**), `PATCH /` (multipart), `DELETE /image`, `PATCH /password` |
 | users | `users` | ADMIN | `POST /` (multipart), `GET /`, `GET /:id`, `GET /:id/full`, `PATCH /:id` (multipart), `DELETE /:id` |
 | transactions | `transactions` | none (SELLER allowed, restricted in service) | `POST /` (`@Idempotent()`), `GET /` (+`summary`), `GET /:id`, `PATCH /:id` (**ADMIN+OWNER**), `DELETE /:id` (**ADMIN+OWNER**), `PATCH /:id/pay` (`@Idempotent()`), `POST /:id/refund` (`@Idempotent()`, **ADMIN+OWNER**) |
 | dashboard | `dashboard` | ADMIN, OWNER | `GET /`, `GET /sellers-report` |
@@ -154,7 +159,7 @@ Helpers in `src/common/utils/paginate.util.ts`:
 - Storage is `PrismaThrottlerStorage` backed by Postgres (`ThrottleBucket` table), so limits hold **across serverless instances**.
 - The storage does the whole hit/block calculation in one atomic `INSERT … ON CONFLICT DO UPDATE`; key format is `` `${throttlerName}:${key}` ``.
 - Depends on `app.set('trust proxy', 1)` in `bootstrap.ts` — without it every user shares one bucket.
-- Per-endpoint overrides today: login 5/60s.
+- Per-endpoint overrides today: login 10/60s, counted **per IP + email** (`loginThrottleTracker`), so coworkers behind one market Wi-Fi/CGNAT don't lock each other out; the global 100/60s per IP still applies.
 
 ## JWT user cache
 
@@ -170,8 +175,8 @@ Helpers in `src/common/utils/paginate.util.ts`:
 
 Endpoints:
 
-- `POST /api/auth/login` — `@Public()`, throttled 5/60s, `@HttpCode(200)`. Body: `{ email, password }`. Response: `{ accessToken, user }` (`AuthResponseDto`) — both fields are returned in the JSON body; the client stores `accessToken` itself (`localStorage`) and sends it back as `Authorization: Bearer <accessToken>`.
-- **There is no `/api/auth/logout` endpoint, no refresh token, no token rotation, and no `RefreshToken` Prisma model.** The access token is a single JWT (`JWT_ACCESS_EXPIRES_IN`, default `15m`) with no server-side revocation — logging out is purely a frontend action (clear `localStorage`).
+- `POST /api/auth/login` — `@Public()`, throttled 10/60s per IP+email, email matched case-insensitively (`Ali@x.com` = `ali@x.com`; old mixed-case rows keep working, DTOs lowercase new input), `@HttpCode(200)`. Body: `{ email, password }`. Response: `{ accessToken, user }` (`AuthResponseDto`) — both fields are returned in the JSON body; the client stores `accessToken` itself (`localStorage`) and sends it back as `Authorization: Bearer <accessToken>`.
+- **There is no `/api/auth/logout` endpoint, no refresh token, no token rotation, and no `RefreshToken` Prisma model.** The access token is a single JWT (`JWT_ACCESS_EXPIRES_IN`, default `365d` — there is no refresh token and a 401 logs the client out, so a short lifetime would kick people out mid-day) with no server-side revocation — logging out is purely a frontend action (clear `localStorage`).
 
 Token internals (`auth.service.ts` / `src/interfaces/jwt-payload.interface.ts`):
 
@@ -212,6 +217,15 @@ Token internals (`auth.service.ts` / `src/interfaces/jwt-payload.interface.ts`):
 - Raw SQL queries in `DashboardMetricsService`, `DashboardInsightsService`, and `DashboardAnalyticsService` use `$queryRaw` with `Prisma.sql` fragments joined via `Prisma.join(conditions, ' AND ')`. **Follow this parameterized `Prisma.sql` pattern for any new raw query.**
 - `GET /dashboard/sellers-report` — handled by `DashboardSellersService`: per-seller `{ seller, salesCount, salesAmount, refundsCount, refundsAmount, debtsCount, debtsAmount, ... }`. Key rule: a REFUND is charged back to the seller who made the **original SALE** (`refundOf.createdById`), not whoever processed the refund. `salesAmount = sales − refunds`.
 
+## Profile domain rules
+
+- `GET /profile/full` → `{ profile, market, earnings }`. `earnings` is `null` for everyone but SELLER: `{ balance: {earned, refunded, paidOut, balance}, month: {since, salesCount, earned}, credits: [last 5 payouts] }`, built from `SellersService.getBalance` (DB `aggregate`, not rows in memory) so the seller profile and the seller card show identical numbers. Sales/products/debtors are intentionally not part of the profile.
+- `PATCH /profile` (multipart): `name`, `phone` (`''` clears), `email`, `currentPassword`, `image`. Changing the email **requires `currentPassword`** (`CURRENT_PASSWORD_REQUIRED` / `CURRENT_PASSWORD_INCORRECT`; `EMAIL_IN_USE` 409) — there is no password-recovery flow, a typo in the login would lock the account. The new avatar is uploaded first (Cloudinary, cropped to 512×512), the row updated, and only then the old file deleted.
+- `DELETE /profile/image` removes the avatar.
+- `PATCH /profile/password` answers 400 (never 401 — the client logs out on 401) with a machine `code`: `PASSWORD_MISMATCH`, `CURRENT_PASSWORD_INCORRECT`, `PASSWORD_SAME_AS_CURRENT`. Hashes with `BCRYPT_ROUNDS`, stamps `User.passwordChangedAt`, returns `{ passwordChangedAt }`. Existing tokens are NOT revoked (see Auth flow); `passwordChangedAt` is there so a later fix can compare it with the token `iat`.
+- Error bodies: `AllExceptionsFilter` forwards `code` and `details` from `new XxxException({ message, code, details })`; clients branch on `code`, not on the message text.
+- Emails are lowercased by `@NormalizeEmail()` on login/profile/user/seller DTOs and looked up with `mode: 'insensitive'`.
+
 ## Users — last-admin protection
 
 `ensureNotLastAdmin()` counts users with `role: ADMIN` and throws `ConflictException('Cannot remove or demote the last admin account')` when `<= 1`. Called on **demotion** and on **delete**.
@@ -222,6 +236,7 @@ Token internals (`auth.service.ts` / `src/interfaces/jwt-payload.interface.ts`):
 - Deterministic (no `Math.random`), relative to "now": 2 markets × (owner + sellers, 5 categories, 25 products, 7 debtors, 45 sales, 18 debts, 9 refunds). Re-seed right before testing the 10-minute seller-cancel rule — the "fresh" debt is created 3 minutes before the seed ran.
 - The seed also writes the stock journal (≈195 movements per market: opening balances, sales, refunds, restocks, write-offs, one cancelled receipt as `SALE`+`VOID`, an inventory `ADJUSTMENT`) and archives one product per market; it throws if `Σ delta ≠ quantity` for any product.
 - Coverage is intentional, so no screen/query is empty: debtor scenarios (reliable / overdue + over credit limit / due soon / advance / settled / no due date / new), debts with advance, partial and full payments, notes, refund reasons, partial + repeated refunds, markup + seller payouts, low/zero/dead stock, products without `costPrice`, sales today/yesterday/last year (for period comparisons), varied hours (heatmap).
+- Profiles: owners/admin/most sellers have a `phone`; the first seller of market 1 has `passwordChangedAt` 12 days ago, the rest `null` (covers both states of the security row); one seller has no phone.
 - Logins (password `12345678Aa` for all): `admin@tradecrm.com` (ADMIN); `alisher@tradecrm.com`, `dilnoza@tradecrm.com` (OWNER); sellers `sultonzoda2011@gmail.com`, `bakhtiyar@`, `madina@` (market 1, @tradecrm.com except the first) and `jasur@`, `nigora@` (market 2).
 - No images are uploaded (all `image` fields are null).
 
@@ -231,7 +246,7 @@ Token internals (`auth.service.ts` / `src/interfaces/jwt-payload.interface.ts`):
 DATABASE_URL, JWT_ACCESS_SECRET, CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
 ```
 
-Optional (validated in `src/config/env.validation.ts` with defaults): `NODE_ENV` (`development`), `JWT_ACCESS_EXPIRES_IN` (`15m`), `BCRYPT_ROUNDS` (`12`), `PORT` (`3000`).
+Optional (validated in `src/config/env.validation.ts` with defaults): `NODE_ENV` (`development`), `JWT_ACCESS_EXPIRES_IN` (`365d`; if prod sets it explicitly, that value wins), `BCRYPT_ROUNDS` (`12`), `PORT` (`3000`).
 
 Not validated — read via raw `process.env`: `DATABASE_POOL_MAX` (default `10`; на Vercel выставить `2`–`3` — каждый serverless-инстанс держит свой pg-пул).
 

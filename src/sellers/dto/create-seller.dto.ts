@@ -1,5 +1,6 @@
 import { IsEmail, IsString, Matches, MaxLength, MinLength } from 'class-validator'
 import { ApiProperty } from '@nestjs/swagger'
+import { NormalizeEmail } from '../../common/utils/email.util'
 
 export class CreateSellerDto {
   @ApiProperty({ example: 'John Doe' })
@@ -9,6 +10,7 @@ export class CreateSellerDto {
   name: string
 
   @ApiProperty({ example: 'seller@tradecrm.com' })
+  @NormalizeEmail()
   @IsEmail()
   email: string
 

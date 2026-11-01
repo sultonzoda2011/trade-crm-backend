@@ -1,6 +1,7 @@
 import { IsEmail, IsEnum, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Role } from '../../enums'
+import { NormalizeEmail } from '../../common/utils/email.util'
 
 export class CreateUserDto {
   @ApiProperty({ example: 'John Doe' })
@@ -10,6 +11,7 @@ export class CreateUserDto {
   name: string
 
   @ApiProperty({ example: 'john@tradecrm.com' })
+  @NormalizeEmail()
   @IsEmail()
   email: string
 
