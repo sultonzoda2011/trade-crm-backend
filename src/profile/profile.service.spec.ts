@@ -68,7 +68,12 @@ describe('ProfileService', () => {
 
 		it('scopes the market of an owner to their own market id', async () => {
 			await service.getFullProfile(owner)
-			expect(markets.findOne).toHaveBeenCalledWith('market-1', 'market-1')
+			expect(markets.findOne).toHaveBeenCalledWith('market-1', 'market-1', { hideEmails: false })
+		})
+
+		it('hides colleagues\' emails from a seller, not from an owner', async () => {
+			await service.getFullProfile(seller)
+			expect(markets.findOne).toHaveBeenCalledWith('market-1', 'market-1', { hideEmails: true })
 		})
 
 		it('has no market and no earnings for an admin without a market', async () => {

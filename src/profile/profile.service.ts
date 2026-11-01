@@ -13,6 +13,7 @@ import { StorageService } from '../common/services/storage.service'
 import { round2 } from '../common/utils/period.util'
 import { Role } from '../enums'
 import { JwtPayload } from '../interfaces'
+import { marketScope } from '../markets/market-scope.util'
 import { MarketsService } from '../markets/markets.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { SellersService } from '../sellers/sellers.service'
@@ -76,7 +77,7 @@ export class ProfileService {
 		const [profile, market, earnings] = await Promise.all([
 			this.getProfile(user.sub),
 			user.marketId
-				? this.marketsService.findOne(user.marketId, user.role === Role.OWNER ? user.marketId : undefined)
+				? this.marketsService.findOne(user.marketId, marketScope(user), { hideEmails: user.role === Role.SELLER })
 				: Promise.resolve(null),
 			user.role === Role.SELLER && user.marketId ? this.getEarnings(user) : Promise.resolve(null)
 		])

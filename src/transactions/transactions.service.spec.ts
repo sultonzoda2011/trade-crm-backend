@@ -38,6 +38,7 @@ describe('TransactionsService', () => {
 	beforeEach(async () => {
 		prisma = {
 			$transaction: jest.fn(),
+			market: { findUnique: jest.fn().mockResolvedValue({ allowSellerSales: false }) },
 			debtor: { findUnique: jest.fn() },
 			product: { findMany: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
 			transaction: {
@@ -75,6 +76,48 @@ describe('TransactionsService', () => {
 			await expect(
 				service.create({ type: TransactionType.SALE } as any, sellerUser)
 			).rejects.toThrow(ForbiddenException)
+		})
+
+		describe('seller sales (Market.allowSellerSales)', () => {
+			it('answers SELLER_SALES_DISABLED when the market has not allowed seller sales', async () => {
+				await expect(
+					service.create({ type: TransactionType.SALE } as any, sellerUser)
+				).rejects.toMatchObject({ response: { code: 'SELLER_SALES_DISABLED' } })
+				expect(prisma.market.findUnique).toHaveBeenCalledWith({
+					where: { id: marketId },
+					select: { allowSellerSales: true }
+				})
+			})
+
+			it('lets a SELLER record a SALE once the owner allowed it', async () => {
+				prisma.market.findUnique.mockResolvedValue({ allowSellerSales: true })
+				prisma.$transaction.mockRejectedValue(new Error('reached-transaction'))
+
+				// Дошли до самой транзакции — запрет по роли пройден.
+				await expect(
+					service.create({ type: TransactionType.SALE, items: [], paymentType: 'CASH' } as any, sellerUser)
+				).rejects.toThrow('reached-transaction')
+			})
+
+			it('never lets a SELLER create a REFUND, even with the flag on', async () => {
+				prisma.market.findUnique.mockResolvedValue({ allowSellerSales: true })
+
+				await expect(
+					service.create({ type: TransactionType.REFUND } as any, sellerUser)
+				).rejects.toMatchObject({ response: { code: 'SELLER_SALES_DISABLED' } })
+				expect(prisma.market.findUnique).not.toHaveBeenCalled()
+			})
+
+			it('does not read the market for debts and for owners', async () => {
+				prisma.$transaction.mockRejectedValue(new Error('reached-transaction'))
+				const debt = { type: TransactionType.DEBT, debtorId: 'd1', items: [], paymentType: 'CASH' } as any
+
+				await expect(service.create(debt, sellerUser)).rejects.toThrow('reached-transaction')
+				await expect(
+					service.create({ type: TransactionType.SALE, items: [], paymentType: 'CASH' } as any, ownerUser)
+				).rejects.toThrow('reached-transaction')
+				expect(prisma.market.findUnique).not.toHaveBeenCalled()
+			})
 		})
 
 		it('throws BadRequest if DEBT has no debtorId', async () => {

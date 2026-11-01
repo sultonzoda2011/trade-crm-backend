@@ -44,9 +44,24 @@ export class TransactionsService {
 
 		// SELLER фиксирует только долги (DEBT). Обычные продажи за наличные
 		// оформляет OWNER/ADMIN — иначе продавец может бесконтрольно
-		// списывать товар со склада без долговой обязанности.
+		// списывать товар со склада без долговой обязанности. Владелец рынка
+		// может разрешить продавцам и SALE (`Market.allowSellerSales`, по
+		// умолчанию выключено). Флаг читаем при каждой продаже, не из токена:
+		// переключение действует сразу, без ожидания кеша пользователя.
 		if (user.role === Role.SELLER && dto.type !== TransactionType.DEBT) {
-			throw new ForbiddenException('Sellers can only create DEBT transactions')
+			const market =
+				dto.type === TransactionType.SALE
+					? await this.prisma.market.findUnique({
+							where: { id: marketId },
+							select: { allowSellerSales: true }
+						})
+					: null
+			if (!market?.allowSellerSales) {
+				throw new ForbiddenException({
+					message: 'Sellers can only create DEBT transactions in this market',
+					code: 'SELLER_SALES_DISABLED'
+				})
+			}
 		}
 
 		const isDebt = dto.type === TransactionType.DEBT

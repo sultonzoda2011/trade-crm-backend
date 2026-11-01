@@ -25,7 +25,7 @@
 - Unit tests use **jest + ts-jest** (`jest.config.js`), no DB access — Prisma is mocked.
 - `jest.config.js`: `rootDir: 'src'`, `testRegex: '.*\\.spec\\.ts$'`, `clearMocks: true`, coverage output `../coverage`.
 - Specs live next to sources as `*.spec.ts`; `tsconfig.build.json` excludes them from the build.
-- 21 spec files cover:
+- 22 spec files cover:
   - `analytics/analytics.service.spec.ts` (sales velocity, stock health, reorder priority, debtor risk, period comparisons)
   - `auth/auth.service.spec.ts` (login finds the user case-insensitively)
   - `auth/login-throttle.util.spec.ts` (login rate-limit bucket = IP + email)
@@ -37,7 +37,8 @@
   - `debtors/debtors.service.spec.ts` (debtor CRUD, summary metrics, credit profile)
   - `common/filters/http-exception.filter.spec.ts` (`code`/`details` of an exception reach the client)
   - `health/health.controller.spec.ts` (DB up/down probe)
-  - `markets/markets.service.spec.ts` (**IDOR scoping** on update/remove)
+  - `markets/markets.service.spec.ts` (**IDOR scoping** on read/update/settings/remove, owner assignment rules, seller sees no emails/money in `overview`)
+  - `markets/market-scope.util.spec.ts` (`marketScope`: admin unscoped, owner/seller own market, no market = matches nothing)
   - `profile/profile.service.spec.ts` (earnings only for sellers, email change needs the password, avatar upload/removal order, password-change error codes)
   - `products/products.service.spec.ts` (stock journal on create/restock/write-off/adjust, archive, bulk price, summary, market scoping)
   - `products/dto/query-product.dto.spec.ts` (`?flag=false` parsing, rolling-window range)
@@ -63,6 +64,7 @@
 - `PrismaService` uses `@prisma/adapter-pg` — the adapter is constructed with the raw `DATABASE_URL` env var, not via PrismaClient's `datasources`.
 - DB config: `prisma.config.ts` (Prisma v7 config file format, not `prisma/schema.prisma` for datasource URLs).
 - Migrations: the repo has no `prisma/migrations/` yet; schema changes ship as idempotent SQL in `prisma/sql/` (run with an `npm run db:*` script) and must leave the DB identical to what `prisma db push` would create.
+- **Market settings migration**: `npm run db:market-settings` (`prisma/sql/20261101_market_settings.sql`) — adds nullable `Market.phone`, `Market.workHours` and `Market.allowSellerSales BOOLEAN NOT NULL DEFAULT false`. Additive, safe to re-run; an old backend keeps working on the new schema and existing markets stay on the old behaviour (sellers record debts only).
 - **Profile migration**: `npm run db:profile` (`prisma/sql/20261031_profile.sql`) — adds nullable `User.phone` and `User.passwordChangedAt`. Additive, safe to re-run; old backend keeps working on the new schema.
 - **Stock journal migration**: `npm run db:stock-movements` (`prisma/sql/20261029_stock_movements.sql`) — creates `StockMovement`, adds `Product.isActive/archivedAt`, backfills each non-zero stock as an `OPENING` movement. Safe to re-run; keeps all data.
 - Run `prisma generate` after any schema change (`npm run prisma:generate`), otherwise `npx tsc` will fail against stale types.
@@ -108,7 +110,7 @@ All paths below are under the `/api` prefix.
 | Module | Prefix | Class-level `@Roles` | Endpoints |
 |---|---|---|---|
 | products | `products` | ADMIN, OWNER, SELLER | `POST /` (multipart, **ADMIN+OWNER**), `GET /` (metrics + filters), `GET /:id`, `PATCH /:id` (multipart, **ADMIN+OWNER**), `POST /:id/restock` (**ADMIN+OWNER**), `DELETE /:id` (**ADMIN+OWNER**) |
-| markets | `markets` | ADMIN, OWNER | `POST /` (multipart, **ADMIN only**), `GET /`, `GET /:id`, `GET /:id/full`, `PATCH /:id` (multipart, ADMIN+OWNER), `DELETE /:id` (**ADMIN only**) |
+| markets | `markets` | ADMIN, OWNER | `POST /` (multipart, **ADMIN only**), `GET /`, `GET /:id` (+SELLER, own market), `GET /:id/overview` (+SELLER, own market), `GET /:id/full` (deprecated), `PATCH /:id` (multipart, ADMIN+OWNER; owner change **ADMIN only**), `PATCH /:id/settings` (JSON, ADMIN+OWNER), `DELETE /:id` (**ADMIN only**) |
 | sellers | `sellers` | OWNER, ADMIN | `POST /` (multipart), `GET /`, `GET /:id`, `GET /:id/full`, `PATCH /:id` (multipart), `DELETE /:id` |
 | debtors | `debtors` | none (SELLER allowed) | `POST /` (`@Idempotent()`), `GET /`, `GET /:id`, `GET /:id/full`, `PATCH /:id`, `DELETE /:id` (**ADMIN+OWNER**) |
 | profile | `profile` | none (any authed user) | `GET /`, `GET /full` (profile + market + `earnings` for sellers), `GET /earnings` (**SELLER**), `PATCH /` (multipart), `DELETE /image`, `PATCH /password` |
@@ -138,7 +140,7 @@ All paths below are under the `/api` prefix.
 
 > Every read/write of a market-owned entity passes the caller's `marketId` down to the service, and a cross-market hit throws **`NotFoundException`, never `ForbiddenException`** — so record existence is not leaked.
 
-- Controllers compute scope as `user.role === Role.OWNER ? user.marketId : undefined` (ADMIN is unscoped).
+- Controllers compute scope with `marketScope(user)` (`src/markets/market-scope.util.ts`): ADMIN is unscoped (`undefined`), OWNER and SELLER get their own `marketId`, and staff without a market get `NO_MARKET_SCOPE` (an id no market has). Never write `user.role === Role.OWNER ? user.marketId : undefined` again: it left a SELLER unscoped and an OWNER without `marketId` able to read every market.
 - Enforced in `markets.service.ts`, `products.service.ts` (`getProductOrThrow` / `restock`), `debtors.service.ts`, `sellers.service.ts`, `transactions.service.ts`.
 - Enforce it inside raw SQL too — e.g. `products.service.ts` and `dashboard-*.service.ts` push `marketId` into `$queryRaw` conditions.
 - Regression tests: `markets.service.spec.ts` → `describe('MarketsService (IDOR scoping)')`, `products.service.spec.ts`, `transactions.service.spec.ts`.
@@ -197,9 +199,17 @@ Token internals (`auth.service.ts` / `src/interfaces/jwt-payload.interface.ts`):
 - `POST /products/bulk-price` (ADMIN/OWNER, needs a market) — `{ percent, categoryId?, roundTo?, dryRun? }`: one `UPDATE` changing prices of active products by ±N% rounded to a step (min price = one step). `dryRun: true` previews up to 20 rows and writes nothing. Past receipts keep their own price snapshot; `costPrice` is untouched. There is no price history table yet.
 - `GET /products` metrics window: `?days=N` (rolling, 1–365) overrides `?period=` (calendar). Boolean query flags (`lowStock`, `needsReorder`, `archived`) go through `toBoolean` — `@Type(() => Boolean)` would turn `"false"` into `true`.
 
+## Markets domain rules
+
+- `Market` has `name`, `address`, `image`, `phone?`, `workHours?` (free text ≤ 200), `allowSellerSales` (default `false`). `phone`/`workHours` accept `''` to clear (stored as `NULL`).
+- `GET /markets/:id` and `GET /markets/:id/overview` are open to ADMIN (any market), OWNER and SELLER (own market only; another id → 404). For a SELLER emails of the owner and colleagues are removed (`hideEmails`); names and phones stay. The same applies to the market inside `GET /profile/full`.
+- `GET /markets/:id/overview` → `{ market, summary }`. `summary` = `{ products (active), debtors, sellers, transactions, management }`. `management` (`totalDebt`, `overdueAmount`, `debtorsWithDebt`, `stockRetailValue`, `stockCostValue`, `productsWithoutCost`, `outOfStock`, `lowStock`) is `null` for sellers. It is composed from `ProductsService.summary` and `DebtorsService.getSummary`, so the numbers equal the Products / Debtors screens. An admin reads any market, so the path id (not the caller's `marketId`) goes to those services. `GET /markets/:id/full` is deprecated (old clients only) — delete it in a separate step after the new frontend is live.
+- `PATCH /markets/:id/settings` (`{ allowSellerSales? }`, JSON, ADMIN+OWNER own market) — separate from the multipart card update so a switch is a tiny idempotent call.
+- `PATCH /markets/:id` changes the owner **only for ADMIN** (`403 MARKET_OWNER_ADMIN_ONLY` for an OWNER; the same `ownerId` sent back is ignored). A new owner must exist and have the OWNER role (`400 MARKET_OWNER_INVALID`) and own no other market (`409 MARKET_OWNER_TAKEN`). `POST /markets` has no "owner defaults to the caller": without `ownerId` → `400 MARKET_OWNER_REQUIRED`. Validation runs before the image upload.
+
 ## Transactions domain rules
 
-- `POST /transactions` — any role, **but a SELLER may only create `DEBT`** → `ForbiddenException('Sellers can only create DEBT transactions')`. Otherwise a seller could drain stock with no debt obligation.
+- `POST /transactions` — any role, **but a SELLER may only create `DEBT`** unless the market allows more: with `Market.allowSellerSales = true` a SELLER may also create `SALE` (never `REFUND`). Otherwise → `ForbiddenException` with `code: 'SELLER_SALES_DISABLED'`. Default is `false`, so a seller cannot drain stock with no debt obligation. The flag is read from the DB on every seller `SALE` (not from the JWT/user cache), so a switch applies at once. Refunds, edits and deletes stay ADMIN/OWNER; a seller's own-mistake cancel (10 min) is still DEBT-only.
 - `DEBT` requires `debtorId` (else `BadRequestException`), and the debtor must belong to the caller's market. `SALE` ignores `debtorId` and optionally persists `customerName`.
 - **Prices are always recomputed from the DB**, never trusted from the client. Line items support `discount` and `markup` (`validateAndComputeItems`); negative line totals are rejected.
 - **Stock decrement is atomic**: `updateMany({ where: { id, quantity: { gte: item.quantity } }, data: { quantity: { decrement } } })`; `count === 0` → `Not enough stock`.
@@ -237,6 +247,7 @@ Token internals (`auth.service.ts` / `src/interfaces/jwt-payload.interface.ts`):
 - The seed also writes the stock journal (≈195 movements per market: opening balances, sales, refunds, restocks, write-offs, one cancelled receipt as `SALE`+`VOID`, an inventory `ADJUSTMENT`) and archives one product per market; it throws if `Σ delta ≠ quantity` for any product.
 - Coverage is intentional, so no screen/query is empty: debtor scenarios (reliable / overdue + over credit limit / due soon / advance / settled / no due date / new), debts with advance, partial and full payments, notes, refund reasons, partial + repeated refunds, markup + seller payouts, low/zero/dead stock, products without `costPrice`, sales today/yesterday/last year (for period comparisons), varied hours (heatmap).
 - Profiles: owners/admin/most sellers have a `phone`; the first seller of market 1 has `passwordChangedAt` 12 days ago, the rest `null` (covers both states of the security row); one seller has no phone.
+- Markets: both have `phone` and `workHours`. «Центральный» has `allowSellerSales = false` (the usual case), «Восточный» `true`. Seed history has seller-made sales in both markets regardless of the flag (the seed bypasses the rule; the flag only governs new records).
 - Logins (password `12345678Aa` for all): `admin@tradecrm.com` (ADMIN); `alisher@tradecrm.com`, `dilnoza@tradecrm.com` (OWNER); sellers `sultonzoda2011@gmail.com`, `bakhtiyar@`, `madina@` (market 1, @tradecrm.com except the first) and `jasur@`, `nigora@` (market 2).
 - No images are uploaded (all `image` fields are null).
 

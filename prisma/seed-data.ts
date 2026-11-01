@@ -3,6 +3,10 @@ import { ProductUnit } from '@prisma/client'
 export interface MarketSeedSpec {
 	name: string
 	address: string
+	phone: string
+	workHours: string
+	/** Могут ли продавцы оформлять обычные продажи (не только долги). */
+	allowSellerSales: boolean
 	owner: { name: string; email: string }
 	sellers: Array<{ name: string; email: string }>
 }
@@ -10,6 +14,10 @@ export interface MarketSeedSpec {
 export const MARKET_1_SPEC: MarketSeedSpec = {
 	name: 'Рынок Центральный',
 	address: 'ул. Ленина, 15, г. Ташкент',
+	phone: '+998 71 221-45-67',
+	workHours: 'Пн–Сб 8:00–18:00, воскресенье — выходной',
+	// Как по умолчанию: продавцы оформляют только долги.
+	allowSellerSales: false,
 	owner: { name: 'Алишер Каримов', email: 'alisher@tradecrm.com' },
 	sellers: [
 		{ name: 'Султонзода', email: 'sultonzoda2011@gmail.com' },
@@ -21,6 +29,10 @@ export const MARKET_1_SPEC: MarketSeedSpec = {
 export const MARKET_2_SPEC: MarketSeedSpec = {
 	name: 'Рынок Восточный',
 	address: 'ул. Амира Темура, 42, г. Ташкент',
+	phone: '+998 71 600-12-34',
+	workHours: 'Ежедневно 7:00–20:00',
+	// Владелец разрешил продавцам обычные продажи.
+	allowSellerSales: true,
 	owner: { name: 'Дилноза Азимова', email: 'dilnoza@tradecrm.com' },
 	sellers: [
 		{ name: 'Жасур Ахмедов', email: 'jasur@tradecrm.com' },
