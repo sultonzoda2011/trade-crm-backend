@@ -44,7 +44,11 @@ export class StorageService {
     })
   }
 
-  async save(file: Express.Multer.File, subfolder: string): Promise<string> {
+  /**
+   * `options.square` — вписать картинку в квадрат N×N (аватары): Cloudinary
+   * обрезает по центру/лицу и хранит уже уменьшенную версию, а не оригинал.
+   */
+  async save(file: Express.Multer.File, subfolder: string, options?: { square?: number }): Promise<string> {
     const ext = ALLOWED_IMAGE_MIME_TYPES[file.mimetype]
     if (!ext || !matchesSignature(file.buffer, file.mimetype)) {
       throw new BadRequestException('File content does not match a supported image type')
@@ -56,6 +60,14 @@ export class StorageService {
         folder: `tradecrm/${subfolder}`,
         public_id: randomUUID(),
         resource_type: 'image',
+        ...(options?.square
+          ? {
+              transformation: [
+                { width: options.square, height: options.square, crop: 'fill', gravity: 'auto' },
+                { quality: 'auto' },
+              ],
+            }
+          : {}),
       },
     )
 

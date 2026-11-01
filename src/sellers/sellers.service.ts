@@ -51,8 +51,8 @@ export class SellersService {
 		if (!marketId)
 			throw new UnauthorizedException('User is not assigned to a market')
 
-		const existing = await this.prisma.user.findUnique({
-			where: { email: dto.email }
+		const existing = await this.prisma.user.findFirst({
+			where: { email: { equals: dto.email, mode: 'insensitive' } }
 		})
 		if (existing) throw new ConflictException('Email already in use')
 
@@ -139,8 +139,8 @@ export class SellersService {
 		const seller = await this.findOne(id, marketId)
 
 		if (dto.email) {
-			const existing = await this.prisma.user.findUnique({
-				where: { email: dto.email }
+			const existing = await this.prisma.user.findFirst({
+				where: { email: { equals: dto.email, mode: 'insensitive' } }
 			})
 			if (existing && existing.id !== id)
 				throw new ConflictException('Email already in use')
@@ -177,10 +177,11 @@ export class SellersService {
 	 * Баланс продавца по надбавкам (markup): сколько он накопил сверх цены
 	 * по своим SALE/DEBT-транзакциям, минус markup, откатившийся возвратами
 	 * тех же строк, минус то, что ему уже выдано (SellerCredit).
-	 * Считается двумя отдельными запросами (earned/refunded), а не одним
-	 * агрегатом — потому что "refunded" ищется по цепочке
-	 * refundOfItem -> исходная транзакция -> createdById, а не напрямую
-	 * по продавцу REFUND-транзакции (возврат обычно оформляет OWNER/ADMIN).
+	 * Считается двумя отдельными агрегатами (earned/refunded), а не одним —
+	 * потому что "refunded" ищется по цепочке refundOfItem -> исходная
+	 * транзакция -> createdById, а не напрямую по продавцу REFUND-транзакции
+	 * (возврат обычно оформляет OWNER/ADMIN). Суммы считает БД (`_sum`), а не
+	 * Node по всем строкам: этот баланс открывается при каждом заходе в профиль.
 	 */
 	async getBalance(id: string, marketId?: string): Promise<{
 		sellerId: string
@@ -191,24 +192,25 @@ export class SellersService {
 	}> {
 		await this.findOne(id, marketId)
 
-		const earnedItems = await this.prisma.transactionItem.findMany({
-			where: {
-				markup: { gt: 0 },
-				transaction: { createdById: id, type: { in: ['SALE', 'DEBT'] } }
-			},
-			select: { markup: true }
-		})
-		const earned = earnedItems.reduce((sum, i) => sum + i.markup, 0)
-
-		const refundedItems = await this.prisma.transactionItem.findMany({
-			where: {
-				markup: { gt: 0 },
-				transaction: { type: 'REFUND' },
-				refundOfItem: { transaction: { createdById: id } }
-			},
-			select: { markup: true }
-		})
-		const refunded = refundedItems.reduce((sum, i) => sum + i.markup, 0)
+		const [earnedAgg, refundedAgg] = await Promise.all([
+			this.prisma.transactionItem.aggregate({
+				where: {
+					markup: { gt: 0 },
+					transaction: { createdById: id, type: { in: ['SALE', 'DEBT'] } }
+				},
+				_sum: { markup: true }
+			}),
+			this.prisma.transactionItem.aggregate({
+				where: {
+					markup: { gt: 0 },
+					transaction: { type: 'REFUND' },
+					refundOfItem: { transaction: { createdById: id } }
+				},
+				_sum: { markup: true }
+			})
+		])
+		const earned = earnedAgg._sum.markup ?? 0
+		const refunded = refundedAgg._sum.markup ?? 0
 
 		const creditsAgg = await this.prisma.sellerCredit.aggregate({
 			where: { sellerId: id },

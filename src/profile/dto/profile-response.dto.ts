@@ -1,24 +1,30 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 export class ProfileResponseDto {
-  @ApiProperty()
-  id: string
+	@ApiProperty()
+	id: string
 
-  @ApiProperty()
-  name: string
+	@ApiProperty()
+	name: string
 
-  @ApiProperty()
-  email: string
+	@ApiProperty()
+	email: string
 
-  @ApiPropertyOptional()
-  image?: string
+	@ApiPropertyOptional({ nullable: true })
+	phone?: string | null
 
-  @ApiProperty()
-  role: string
+	@ApiPropertyOptional({ nullable: true })
+	image?: string | null
 
-  @ApiPropertyOptional()
-  marketId?: string
+	@ApiProperty()
+	role: string
 
-  @ApiProperty()
-  createdAt: string
+	@ApiPropertyOptional({ nullable: true })
+	marketId?: string | null
+
+	@ApiProperty()
+	createdAt: string
+
+	@ApiPropertyOptional({ nullable: true, description: 'When the password was last changed; null = never changed.' })
+	passwordChangedAt?: string | null
 }

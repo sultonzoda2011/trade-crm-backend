@@ -1,6 +1,7 @@
 import {
 	Body,
 	Controller,
+	Delete,
 	Get,
 	HttpCode,
 	HttpStatus,
@@ -11,9 +12,9 @@ import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiTags } from '@nestjs/swagger'
 import { Express } from 'express'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Roles } from '../auth/decorators/roles.decorator'
-import { Role } from '../enums'
 import { ApiErrorResponse } from '../common/decorators/api-error-response.decorator'
 import { UploadImage } from '../common/decorators/upload-image.decorator'
+import { Role } from '../enums'
 import { JwtPayload } from '../interfaces'
 import { ChangePasswordDto } from './dto/change-password.dto'
 import { ProfileResponseDto } from './dto/profile-response.dto'
@@ -35,9 +36,16 @@ export class ProfileController {
 	}
 
 	@Get('full')
-	@ApiOkResponse({ description: 'Profile page in one round-trip: profile + own market + recent transactions preview' })
+	@ApiOkResponse({ description: 'Profile screen in one round-trip: profile + own market + earnings (sellers only)' })
 	getFullProfile(@CurrentUser() user: JwtPayload) {
 		return this.profileService.getFullProfile(user)
+	}
+
+	@Get('earnings')
+	@Roles(Role.SELLER)
+	@ApiOkResponse({ description: 'Seller markup balance, current-month totals and the latest payouts' })
+	getEarnings(@CurrentUser() user: JwtPayload) {
+		return this.profileService.getEarnings(user)
 	}
 
 	@Patch()
@@ -48,22 +56,30 @@ export class ProfileController {
 			properties: {
 				name: { type: 'string', example: 'John Doe' },
 				email: { type: 'string', example: 'john@tradecrm.com' },
-				image: { type: 'string', format: 'binary', description: 'New avatar (replaces existing). Omit to keep current.' },
-			},
-		},
+				phone: { type: 'string', example: '+992 900 12-34-56', description: 'Empty string clears it.' },
+				currentPassword: { type: 'string', description: 'Required only when the email changes.' },
+				image: { type: 'string', format: 'binary', description: 'New avatar (replaces existing). Omit to keep current.' }
+			}
+		}
 	})
 	@ApiOkResponse({ type: ProfileResponseDto })
 	updateProfile(
 		@Body() dto: UpdateProfileDto,
-		@UploadedFile() file?: Express.Multer.File,
-		@CurrentUser() user?: JwtPayload,
+		@CurrentUser() user: JwtPayload,
+		@UploadedFile() file?: Express.Multer.File
 	) {
-		return this.profileService.updateProfile(user!.sub, dto, file)
+		return this.profileService.updateProfile(user.sub, dto, file)
+	}
+
+	@Delete('image')
+	@ApiOkResponse({ type: ProfileResponseDto, description: 'Removes the avatar' })
+	removeImage(@CurrentUser() user: JwtPayload) {
+		return this.profileService.removeImage(user.sub)
 	}
 
 	@Patch('password')
 	@HttpCode(HttpStatus.OK)
-	@ApiOkResponse({ description: 'Password updated' })
+	@ApiOkResponse({ description: 'Password updated; returns `{ passwordChangedAt }`' })
 	changePassword(@Body() dto: ChangePasswordDto, @CurrentUser() user: JwtPayload) {
 		return this.profileService.changePassword(user.sub, dto)
 	}

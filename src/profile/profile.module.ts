@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common'
+import { MarketsModule } from '../markets/markets.module'
+import { SellersModule } from '../sellers/sellers.module'
 import { ProfileController } from './profile.controller'
 import { ProfileService } from './profile.service'
-import { MarketsModule } from '../markets/markets.module'
-import { TransactionsModule } from '../transactions/transactions.module'
 
 @Module({
-	imports: [MarketsModule, TransactionsModule],
+	imports: [MarketsModule, SellersModule],
 	controllers: [ProfileController],
 	providers: [ProfileService]
 })

@@ -20,8 +20,15 @@ class EnvironmentVariables {
 
  
 
+  /**
+   * Срок жизни токена. Refresh-токенов нет, а 401 на клиенте = выход, поэтому
+   * короткий срок (15m) выкидывал бы людей посреди рабочего дня. По умолчанию —
+   * год: человека, которого удалили, всё равно отсекает JwtStrategy (проверка
+   * пользователя в БД раз в 60 секунд).
+   */
   @IsString()
-  JWT_ACCESS_EXPIRES_IN: string
+  @IsOptional()
+  JWT_ACCESS_EXPIRES_IN: string = '365d'
 
 
   @IsNumber()

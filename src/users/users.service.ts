@@ -46,8 +46,8 @@ export class UsersService {
 	} as const
 
 	async create(dto: CreateUserDto, file?: Express.Multer.File) {
-		const existing = await this.prisma.user.findUnique({
-			where: { email: dto.email }
+		const existing = await this.prisma.user.findFirst({
+			where: { email: { equals: dto.email, mode: 'insensitive' } }
 		})
 		if (existing) throw new ConflictException('Email already in use')
 
@@ -145,8 +145,8 @@ export class UsersService {
 		}
 
 		if (dto.email) {
-			const existing = await this.prisma.user.findUnique({
-				where: { email: dto.email }
+			const existing = await this.prisma.user.findFirst({
+				where: { email: { equals: dto.email, mode: 'insensitive' } }
 			})
 			if (existing && existing.id !== id)
 				throw new ConflictException('Email already in use')

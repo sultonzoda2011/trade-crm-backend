@@ -6,6 +6,7 @@ import { AuthService } from './auth.service'
 import { Public } from './decorators/public.decorator'
 import { AuthResponseDto } from './dto/auth-response.dto'
 import { LoginDto } from './dto/login.dto'
+import { loginThrottleTracker } from './login-throttle.util'
 
 @ApiTags('Auth')
 @ApiErrorResponse()
@@ -20,7 +21,7 @@ export class AuthController {
 	 * Cookie больше не используются.
 	 */
 	@Public()
-	@Throttle({ default: { limit: 5, ttl: 60_000 } })
+	@Throttle({ default: { limit: 10, ttl: 60_000, getTracker: loginThrottleTracker } })
 	@Post('login')
 	@HttpCode(HttpStatus.OK)
 	@ApiOkResponse({

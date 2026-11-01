@@ -29,6 +29,14 @@ const ago = (days: number, minutes = 0) =>
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 
+/** Детерминированные телефоны для профилей: +992 90X YY-ZZ-WW. */
+let phoneSeq = 0
+const nextPhone = () => {
+	phoneSeq += 1
+	const n = String(1000000 + phoneSeq * 137731).slice(-6)
+	return `+992 90${phoneSeq % 10} ${n.slice(0, 2)}-${n.slice(2, 4)}-${n.slice(4, 6)}`
+}
+
 type Seller = { id: string; name: string }
 type Owner = { id: string }
 
@@ -80,6 +88,8 @@ async function createAdmin() {
 			email: 'admin@tradecrm.com',
 			password,
 			role: 'ADMIN',
+			phone: nextPhone(),
+			passwordChangedAt: ago(90),
 			image: null
 		}
 	})
@@ -99,6 +109,8 @@ async function createMarketWithStaff(spec: MarketSeedSpec): Promise<MarketUsers>
 			email: spec.owner.email,
 			password,
 			role: 'OWNER',
+			phone: nextPhone(),
+			passwordChangedAt: ago(40),
 			image: null
 		}
 	})
@@ -115,7 +127,7 @@ async function createMarketWithStaff(spec: MarketSeedSpec): Promise<MarketUsers>
 		data: { marketId: market.id }
 	})
 	const sellers: Seller[] = []
-	for (const s of spec.sellers) {
+	for (const [i, s] of spec.sellers.entries()) {
 		sellers.push(
 			await prisma.user.create({
 				data: {
@@ -124,6 +136,10 @@ async function createMarketWithStaff(spec: MarketSeedSpec): Promise<MarketUsers>
 					password,
 					role: 'SELLER',
 					marketId: market.id,
+					// Покрываем оба состояния экрана: «пароль менялся» (первый продавец)
+					// и «не менялся» / без телефона (остальные).
+					phone: i === 0 ? nextPhone() : i === 1 ? null : nextPhone(),
+					passwordChangedAt: i === 0 ? ago(12) : null,
 					image: null
 				}
 			})

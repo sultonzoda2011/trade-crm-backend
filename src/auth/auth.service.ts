@@ -13,7 +13,11 @@ export class AuthService {
 	) {}
 
 	async login(email: string, password: string): Promise<AuthResponseDto> {
-		const user = await this.prisma.user.findUnique({ where: { email } })
+		// Без учёта регистра: `Ali@x.com` и `ali@x.com` — один и тот же человек.
+		const user = await this.prisma.user.findFirst({
+			where: { email: { equals: email, mode: 'insensitive' } },
+			orderBy: { createdAt: 'asc' }
+		})
 
 		if (!user) {
 			throw new UnauthorizedException('Invalid email or password')
