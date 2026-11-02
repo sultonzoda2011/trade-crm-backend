@@ -118,6 +118,9 @@ async function createMarketWithStaff(spec: MarketSeedSpec): Promise<MarketUsers>
 		data: {
 			name: spec.name,
 			address: spec.address,
+			phone: spec.phone,
+			workHours: spec.workHours,
+			allowSellerSales: spec.allowSellerSales,
 			ownerId: owner.id,
 			image: null
 		}
@@ -1019,6 +1022,9 @@ async function main() {
 	console.log(`  Владельцы: alisher@tradecrm.com, dilnoza@tradecrm.com`)
 	console.log(
 		`  Продавцы: sultonzoda2011@gmail.com, bakhtiyar@tradecrm.com, madina@tradecrm.com, jasur@tradecrm.com, nigora@tradecrm.com`
+	)
+	console.log(
+		`  Продажи продавцов: «Восточный» разрешает (jasur@, nigora@), «Центральный» — только долги (sultonzoda2011@gmail.com)`
 	)
 }
 

@@ -15,6 +15,7 @@
 		"prisma:seed": "ts-node prisma/seed.ts",
 		"db:stock-movements": "prisma db execute --file prisma/sql/20261029_stock_movements.sql",
 		"db:profile": "prisma db execute --file prisma/sql/20261031_profile.sql",
+		"db:market-settings": "prisma db execute --file prisma/sql/20261101_market_settings.sql",
 		"test": "jest",
 		"test:watch": "jest --watch",
 		"test:cov": "jest --coverage"

@@ -37,6 +37,9 @@ model Market {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   image        String?
+  phone        String?
+  workHours    String?
+  allowSellerSales Boolean   @default(false)
   categories   Category[]
   debtors      Debtor[]
   owner        User          @relation("MarketOwner", fields: [ownerId], references: [id])

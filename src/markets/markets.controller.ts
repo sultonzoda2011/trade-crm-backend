@@ -9,9 +9,11 @@ import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe'
 import { Role } from '../enums'
 import { JwtPayload } from '../interfaces'
 import { CreateMarketDto } from './dto/create-market.dto'
-import { MarketResponseDto } from './dto/market-response.dto'
+import { MarketOverviewResponseDto, MarketResponseDto } from './dto/market-response.dto'
 import { QueryMarketDto } from './dto/query-market.dto'
 import { UpdateMarketDto } from './dto/update-market.dto'
+import { UpdateMarketSettingsDto } from './dto/update-market-settings.dto'
+import { marketScope } from './market-scope.util'
 import { MarketsService } from './markets.service'
 
 @ApiTags('Markets')
@@ -36,7 +38,9 @@ export class MarketsController {
       properties: {
         name: { type: 'string', example: 'Central Market', description: 'Market name (2-200 chars)' },
         address: { type: 'string', example: '123 Main St', description: 'Market address (5-500 chars)' },
-        ownerId: { type: 'string', description: 'Owner user ID (defaults to current user)' },
+        phone: { type: 'string', example: '+992 900 12-34-56', description: 'Market phone (optional)' },
+        workHours: { type: 'string', example: 'Пн–Сб 8:00–18:00', description: 'Working hours, free text (optional)' },
+        ownerId: { type: 'string', description: 'Owner user ID: an OWNER who owns no other market' },
         image: { type: 'string', format: 'binary', description: 'Market image (jpg, png, webp, gif; max 5MB)' },
       },
     },
@@ -58,7 +62,7 @@ export class MarketsController {
   @ApiQuery({ name: 'limit', required: false, example: 20, description: 'Items per page (max 100)' })
   findAll(@Query() query: QueryMarketDto, @CurrentUser() user: JwtPayload): Promise<PaginatedResult<unknown>> {
     // ADMIN видит все маркеты; OWNER — только свой.
-    return this.marketsService.findAll(query, user.role === Role.OWNER ? user.marketId : undefined)
+    return this.marketsService.findAll(query, marketScope(user))
   }
 
   @Get(':id')
@@ -67,14 +71,29 @@ export class MarketsController {
   @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Market ID' })
   @ApiOkResponse({ type: MarketResponseDto, description: 'The found market' })
   findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
-    return this.marketsService.findOne(id, user.role === Role.OWNER ? user.marketId : undefined)
+    // ADMIN — любой рынок; OWNER и SELLER — только свой (чужой = 404). Продавцу не отдаём email.
+    return this.marketsService.findOne(id, marketScope(user), { hideEmails: user.role === Role.SELLER })
+  }
+
+  @Get(':id/overview')
+  @Roles(Role.ADMIN, Role.OWNER, Role.SELLER)
+  @ApiOperation({
+    summary: 'Market screen in one round-trip',
+    description:
+      'Market card + summary (counts for everyone; debt and stock value in `summary.management` for ADMIN/OWNER only, null for sellers).',
+  })
+  @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Market ID' })
+  @ApiOkResponse({ type: MarketOverviewResponseDto })
+  overview(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+    return this.marketsService.overview(id, user)
   }
 
   @Get(':id/full')
   @Roles(Role.ADMIN, Role.OWNER, Role.SELLER)
   @ApiOperation({
-    summary: 'Market detail page in one round-trip',
-    description: 'Market + products/debtors/transactions previews (own market only) — 4 queries in parallel server-side instead of 4 client round-trips.'
+    summary: 'Market detail page in one round-trip (deprecated: use /overview)',
+    deprecated: true,
+    description: 'Market + products/debtors/transactions previews (own market only). Kept for old clients; the market screen reads GET /markets/:id/overview.'
   })
   @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Market ID' })
   findOneFull(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
@@ -93,7 +112,9 @@ export class MarketsController {
       properties: {
         name: { type: 'string', example: 'Central Market', description: 'Market name (2-200 chars)' },
         address: { type: 'string', example: '123 Main St', description: 'Market address (5-500 chars)' },
-        ownerId: { type: 'string', description: 'New owner user ID' },
+        phone: { type: 'string', example: '+992 900 12-34-56', description: 'Market phone. Empty string clears it.' },
+        workHours: { type: 'string', example: 'Пн–Сб 8:00–18:00', description: 'Working hours. Empty string clears it.' },
+        ownerId: { type: 'string', description: 'New owner user ID (ADMIN only; an OWNER who owns no other market)' },
         image: { type: 'string', format: 'binary', description: 'New market image (replaces existing). Omit to keep current.' },
       },
     },
@@ -105,8 +126,24 @@ export class MarketsController {
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: JwtPayload,
   ) {
-    // OWNER может обновлять только свой маркет (IDOR-защита).
-    return this.marketsService.update(id, dto, file, user.role === Role.OWNER ? user.marketId : undefined)
+    // OWNER может обновлять только свой маркет (IDOR-защита) и не может менять владельца.
+    return this.marketsService.update(id, dto, file, marketScope(user), user.role === Role.ADMIN)
+  }
+
+  @Patch(':id/settings')
+  @Roles(Role.ADMIN, Role.OWNER)
+  @ApiOperation({
+    summary: 'Update market settings',
+    description: 'JSON settings such as `allowSellerSales`. Admin or the owner of the market.',
+  })
+  @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Market ID' })
+  @ApiOkResponse({ type: MarketResponseDto, description: 'The updated market' })
+  updateSettings(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateMarketSettingsDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.marketsService.updateSettings(id, dto, marketScope(user))
   }
 
   @Delete(':id')
@@ -115,6 +152,6 @@ export class MarketsController {
   @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Market ID' })
   @ApiOkResponse({ description: 'Market successfully deleted' })
   remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
-    return this.marketsService.remove(id, user.role === Role.OWNER ? user.marketId : undefined)
+    return this.marketsService.remove(id, marketScope(user))
   }
 }

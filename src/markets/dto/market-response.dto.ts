@@ -7,8 +7,11 @@ class MarketOwnerDto {
   @ApiProperty({ description: 'Owner name' })
   name: string
 
-  @ApiProperty({ description: 'Owner email' })
-  email: string
+  @ApiPropertyOptional({ description: 'Owner email. Not sent to sellers.' })
+  email?: string
+
+  @ApiPropertyOptional({ nullable: true, description: 'Owner phone' })
+  phone?: string | null
 
   @ApiPropertyOptional({ description: 'Owner role' })
   role?: string
@@ -21,8 +24,11 @@ class MarketUserDto {
   @ApiProperty({ description: 'User name' })
   name: string
 
-  @ApiProperty({ description: 'User email' })
-  email: string
+  @ApiPropertyOptional({ description: 'User email. Not sent to sellers.' })
+  email?: string
+
+  @ApiPropertyOptional({ nullable: true, description: 'User phone' })
+  phone?: string | null
 
   @ApiProperty({ description: 'User role' })
   role: string
@@ -52,6 +58,15 @@ export class MarketResponseDto {
   @ApiPropertyOptional({ description: 'Market image URL' })
   image?: string
 
+  @ApiPropertyOptional({ nullable: true, description: 'Market phone' })
+  phone?: string | null
+
+  @ApiPropertyOptional({ nullable: true, description: 'Working hours, free text' })
+  workHours?: string | null
+
+  @ApiProperty({ description: 'May sellers record regular sales (not only debts)?' })
+  allowSellerSales: boolean
+
   @ApiProperty({ description: 'Owner user ID' })
   ownerId: string
 
@@ -69,4 +84,59 @@ export class MarketResponseDto {
 
   @ApiPropertyOptional({ type: MarketOwnerDto, description: 'Market owner details' })
   owner?: MarketOwnerDto
+}
+
+class MarketManagementSummaryDto {
+  @ApiProperty({ description: 'Total outstanding debt of the market' })
+  totalDebt: number
+
+  @ApiProperty({ description: 'Part of the debt that is overdue' })
+  overdueAmount: number
+
+  @ApiProperty({ description: 'Debtors who owe something right now' })
+  debtorsWithDebt: number
+
+  @ApiProperty({ description: 'Stock value at retail (sale) prices, active products' })
+  stockRetailValue: number
+
+  @ApiProperty({ description: 'Stock value at cost prices (only products with a cost price)' })
+  stockCostValue: number
+
+  @ApiProperty({ description: 'Active products without a cost price (cost value is partial)' })
+  productsWithoutCost: number
+
+  @ApiProperty({ description: 'Active products that are out of stock' })
+  outOfStock: number
+
+  @ApiProperty({ description: 'Active products below their low-stock threshold' })
+  lowStock: number
+}
+
+class MarketSummaryDto {
+  @ApiProperty({ description: 'Active (not archived) products' })
+  products: number
+
+  @ApiProperty({ description: 'Debtors of the market' })
+  debtors: number
+
+  @ApiProperty({ description: 'Users with the SELLER role' })
+  sellers: number
+
+  @ApiProperty({ description: 'All transactions of the market' })
+  transactions: number
+
+  @ApiPropertyOptional({
+    type: MarketManagementSummaryDto,
+    nullable: true,
+    description: 'Money and stock health. null for sellers.',
+  })
+  management: MarketManagementSummaryDto | null
+}
+
+export class MarketOverviewResponseDto {
+  @ApiProperty({ type: MarketResponseDto })
+  market: MarketResponseDto
+
+  @ApiProperty({ type: MarketSummaryDto })
+  summary: MarketSummaryDto
 }
