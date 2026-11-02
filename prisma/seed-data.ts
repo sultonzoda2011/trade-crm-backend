@@ -43,45 +43,84 @@ export const MARKET_2_SPEC: MarketSeedSpec = {
 export const CATEGORY_DATA_1 = [
 	{
 		name: 'Молочные продукты',
-		description: 'Свежие молоко, йогурты, сыры и творог от местных ферм'
+		description: 'Свежие молоко, йогурты, сыры и творог от местных ферм',
+		color: 'blue',
+		sortOrder: 1
 	},
 	{
 		name: 'Хлебобулочные изделия',
-		description: 'Свежая выпечка, хлеб и лепёшки каждый день'
+		description: 'Свежая выпечка, хлеб и лепёшки каждый день',
+		color: 'orange',
+		sortOrder: 3
 	},
 	{
 		name: 'Овощи и фрукты',
-		description: 'Сезонные овощи и фрукты напрямую с базара'
+		description: 'Сезонные овощи и фрукты напрямую с базара',
+		color: 'green',
+		sortOrder: 0
 	},
 	{
 		name: 'Мясо и птица',
-		description: 'Свежее мясо, птица и мясные полуфабрикаты'
+		description: 'Свежее мясо, птица и мясные полуфабрикаты',
+		color: 'red',
+		sortOrder: 2
 	},
 	{
 		name: 'Бакалея',
-		description: 'Сахар, мука, масло и другие товары повседневного спроса'
+		description: 'Сахар, мука, масло и другие товары повседневного спроса',
+		color: 'yellow',
+		sortOrder: 4
 	}
 ]
+
+/** Пустая категория: проверяет экран «пусто» и удаление без товаров. */
+export const EXTRA_CATEGORY_1 = {
+	name: 'Новинки',
+	description: 'Пока пусто: сюда пойдут новые товары',
+	color: null,
+	sortOrder: 5
+}
 
 export const CATEGORY_DATA_2 = [
 	{
 		name: 'Напитки',
-		description: 'Вода, соки, газированные и горячие напитки'
+		description: 'Вода, соки, газированные и горячие напитки',
+		color: 'teal',
+		sortOrder: 0
 	},
 	{
 		name: 'Кондитерские изделия',
-		description: 'Шоколад, конфеты, зефир и другие сладости'
+		description: 'Шоколад, конфеты, зефир и другие сладости',
+		color: 'pink',
+		sortOrder: 1
 	},
 	{
 		name: 'Морепродукты',
-		description: 'Свежая и мороженая рыба, креветки и мидии'
+		description: 'Свежая и мороженая рыба, креветки и мидии',
+		color: 'indigo',
+		sortOrder: 2
 	},
 	{
 		name: 'Крупы и макароны',
-		description: 'Крупы, макаронные изделия и бобовые'
+		description: 'Крупы, макаронные изделия и бобовые',
+		color: 'purple',
+		sortOrder: 3
 	},
-	{ name: 'Консервация', description: 'Консервы, маринады и томатная паста' }
+	{
+		name: 'Консервация',
+		description: 'Консервы, маринады и томатная паста',
+		color: null,
+		sortOrder: 4
+	}
 ]
+
+/** Пустая категория: проверяет экран «пусто» и удаление без товаров. */
+export const EXTRA_CATEGORY_2 = {
+	name: 'Сезонное',
+	description: 'Товары к праздникам: пока ничего нет',
+	color: 'gray',
+	sortOrder: 5
+}
 
 export const MARKET_1_PRODUCTS = [
 	{ name: 'Молоко свежее', description: 'Жирность 3.2%, 1л', price: 8000, unit: ProductUnit.L, quantity: 50 },

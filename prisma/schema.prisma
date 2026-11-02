@@ -57,11 +57,18 @@ model Category {
   updatedAt   DateTime  @updatedAt
   description String?
   image       String?
+  // Цвет-метка из фиксированной палитры (ключ вроде `blue`, не hex — чтобы цвет
+  // подстраивался под светлую/тёмную тему). null = «без цвета».
+  color       String?
+  // Порядок категорий, который задаёт владелец: меньше — выше. У старых
+  // категорий все 0, поэтому список сортируется по (sortOrder, name).
+  sortOrder   Int       @default(0)
   market      Market    @relation(fields: [marketId], references: [id], onDelete: Cascade)
   products    Product[]
 
   @@unique([marketId, name])
   @@index([marketId])
+  @@index([marketId, sortOrder])
 }
 
 model Product {

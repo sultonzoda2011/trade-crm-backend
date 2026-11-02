@@ -361,4 +361,35 @@ describe('ProductsService', () => {
 			expect(prisma.$executeRaw).toHaveBeenCalledTimes(1)
 		})
 	})
+	describe('findAll: товары без категории', () => {
+		const make = () => {
+			const db: any = {
+				product: {
+					findMany: jest.fn().mockResolvedValue([]),
+					count: jest.fn().mockResolvedValue(0)
+				},
+				$queryRaw: jest.fn().mockResolvedValue([{ count: BigInt(0) }])
+			}
+			const analytics = { getProductSalesRows: jest.fn().mockResolvedValue([]) }
+			return { db, svc: new ProductsService(db, { delete: jest.fn() } as any, analytics as any) }
+		}
+
+		it('uncategorized=true ищет товары с categoryId = null', async () => {
+			const { db, svc } = make()
+			await svc.findAll({ uncategorized: true, page: 1, limit: 20 } as any, marketId)
+			expect(db.product.findMany.mock.calls[0][0].where).toMatchObject({
+				marketId,
+				categoryId: null
+			})
+		})
+
+		it('categoryId сильнее uncategorized', async () => {
+			const { db, svc } = make()
+			await svc.findAll(
+				{ uncategorized: true, categoryId: 'cat-1', page: 1, limit: 20 } as any,
+				marketId
+			)
+			expect(db.product.findMany.mock.calls[0][0].where.categoryId).toBe('cat-1')
+		})
+	})
 })
