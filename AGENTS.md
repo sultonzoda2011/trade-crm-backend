@@ -25,7 +25,7 @@
 - Unit tests use **jest + ts-jest** (`jest.config.js`), no DB access — Prisma is mocked.
 - `jest.config.js`: `rootDir: 'src'`, `testRegex: '.*\\.spec\\.ts$'`, `clearMocks: true`, coverage output `../coverage`.
 - Specs live next to sources as `*.spec.ts`; `tsconfig.build.json` excludes them from the build.
-- 22 spec files cover:
+- 23 spec files cover:
   - `analytics/analytics.service.spec.ts` (sales velocity, stock health, reorder priority, debtor risk, period comparisons)
   - `auth/auth.service.spec.ts` (login finds the user case-insensitively)
   - `auth/login-throttle.util.spec.ts` (login rate-limit bucket = IP + email)
@@ -35,6 +35,7 @@
   - `common/utils/period.util.spec.ts` (UTC period window resolution & previous-period calculation)
   - `dashboard/dashboard.service.spec.ts` (stats, revenue trend, payment distribution, sub-service orchestration)
   - `debtors/debtors.service.spec.ts` (debtor CRUD, summary metrics, credit profile)
+  - `categories/categories.service.spec.ts` (controller roles — a seller cannot change categories, **IDOR scoping**, owner order, active-only counts and no `stockValue` for sellers, case-insensitive duplicate names, delete with `moveTo`/`detach`, reorder)
   - `common/filters/http-exception.filter.spec.ts` (`code`/`details` of an exception reach the client)
   - `health/health.controller.spec.ts` (DB up/down probe)
   - `markets/markets.service.spec.ts` (**IDOR scoping** on read/update/settings/remove, owner assignment rules, seller sees no emails/money in `overview`)
@@ -64,6 +65,7 @@
 - `PrismaService` uses `@prisma/adapter-pg` — the adapter is constructed with the raw `DATABASE_URL` env var, not via PrismaClient's `datasources`.
 - DB config: `prisma.config.ts` (Prisma v7 config file format, not `prisma/schema.prisma` for datasource URLs).
 - Migrations: the repo has no `prisma/migrations/` yet; schema changes ship as idempotent SQL in `prisma/sql/` (run with an `npm run db:*` script) and must leave the DB identical to what `prisma db push` would create.
+- **Categories migration**: `npm run db:categories` (`prisma/sql/20261102_categories.sql`) — adds nullable `Category.color`, `Category.sortOrder INTEGER NOT NULL DEFAULT 0` and index `(marketId, sortOrder)`. Additive, safe to re-run; existing categories keep `sortOrder = 0`, so they sort alphabetically until the owner reorders.
 - **Market settings migration**: `npm run db:market-settings` (`prisma/sql/20261101_market_settings.sql`) — adds nullable `Market.phone`, `Market.workHours` and `Market.allowSellerSales BOOLEAN NOT NULL DEFAULT false`. Additive, safe to re-run; an old backend keeps working on the new schema and existing markets stay on the old behaviour (sellers record debts only).
 - **Profile migration**: `npm run db:profile` (`prisma/sql/20261031_profile.sql`) — adds nullable `User.phone` and `User.passwordChangedAt`. Additive, safe to re-run; old backend keeps working on the new schema.
 - **Stock journal migration**: `npm run db:stock-movements` (`prisma/sql/20261029_stock_movements.sql`) — creates `StockMovement`, adds `Product.isActive/archivedAt`, backfills each non-zero stock as an `OPENING` movement. Safe to re-run; keeps all data.
@@ -109,6 +111,7 @@ All paths below are under the `/api` prefix.
 
 | Module | Prefix | Class-level `@Roles` | Endpoints |
 |---|---|---|---|
+| categories | `categories` | ADMIN, OWNER, SELLER (read) | `GET /` (owner order, active products count, stock value for ADMIN/OWNER), `GET /:id`, `GET /:id/full`; **ADMIN+OWNER only**: `POST /` (multipart), `GET /summary`, `PUT /order`, `PATCH /:id` (multipart), `DELETE /:id?moveTo=<id>\|detach=true` |
 | products | `products` | ADMIN, OWNER, SELLER | `POST /` (multipart, **ADMIN+OWNER**), `GET /` (metrics + filters), `GET /:id`, `PATCH /:id` (multipart, **ADMIN+OWNER**), `POST /:id/restock` (**ADMIN+OWNER**), `DELETE /:id` (**ADMIN+OWNER**) |
 | markets | `markets` | ADMIN, OWNER | `POST /` (multipart, **ADMIN only**), `GET /`, `GET /:id` (+SELLER, own market), `GET /:id/overview` (+SELLER, own market), `GET /:id/full` (deprecated), `PATCH /:id` (multipart, ADMIN+OWNER; owner change **ADMIN only**), `PATCH /:id/settings` (JSON, ADMIN+OWNER), `DELETE /:id` (**ADMIN only**) |
 | sellers | `sellers` | OWNER, ADMIN | `POST /` (multipart), `GET /`, `GET /:id`, `GET /:id/full`, `PATCH /:id` (multipart), `DELETE /:id` |
@@ -199,6 +202,18 @@ Token internals (`auth.service.ts` / `src/interfaces/jwt-payload.interface.ts`):
 - `POST /products/bulk-price` (ADMIN/OWNER, needs a market) — `{ percent, categoryId?, roundTo?, dryRun? }`: one `UPDATE` changing prices of active products by ±N% rounded to a step (min price = one step). `dryRun: true` previews up to 20 rows and writes nothing. Past receipts keep their own price snapshot; `costPrice` is untouched. There is no price history table yet.
 - `GET /products` metrics window: `?days=N` (rolling, 1–365) overrides `?period=` (calendar). Boolean query flags (`lowStock`, `needsReorder`, `archived`) go through `toBoolean` — `@Type(() => Boolean)` would turn `"false"` into `true`.
 
+## Categories domain rules
+
+- **Roles.** Everyone may read (a seller needs categories in the product picker); only ADMIN/OWNER may create, edit, reorder or delete. Before the redesign `POST/PATCH/DELETE` had no narrowing, so a seller could change categories through the API — keep the method-level `@Roles(Role.ADMIN, Role.OWNER)`; `categories.service.spec.ts` asserts it.
+- **Scope.** `marketScope(user)` everywhere (not the raw `marketId`): an owner/seller without a market must not see every market. Foreign category → `NotFoundException`. `create` needs the caller's own `marketId` (an admin has none and cannot create).
+- **Order.** `Category.sortOrder` (lower = higher). The list sorts by `(sortOrder, name)` unless `sortBy` is given; a new category goes to the end (`max + 1`). `PUT /categories/order { ids }` writes `0..n` in one transaction: listed ids first, unlisted ones (e.g. added from another phone) after them in their previous order; all ids must belong to one visible market.
+- **Counts and money.** `_count.products` is **active** products only (archived ones used to be counted). Extra fields: `archivedCount`, `lowStockCount`, `outOfStockCount`, and `stockValue` (retail price × quantity) — `stockValue` is never sent to a SELLER. Stats come from one grouped `$queryRaw` per page (`statsFor`).
+- **Color.** A key from `CATEGORY_COLORS` (`category-colors.ts`, mirrored in the frontend `categoryColors.ts`), never hex: the frontend picks the shade per theme. Empty string on update clears it.
+- **Names.** Unique per market, compared **case-insensitively** and trimmed; also on rename. Error `CATEGORY_NAME_TAKEN` (409); a P2002 race maps to the same code.
+- **Delete.** A category with products (archived included — they hold the FK) needs a decision: `?moveTo=<categoryId>` (target must be in the same market) or `?detach=true` (products keep `categoryId = null`). Without either: 409 `CATEGORY_HAS_PRODUCTS` with `details.productsCount`. `moveTo` = self → 400 `CATEGORY_MOVE_TARGET_INVALID`. Move/detach and delete run in one transaction; the image is deleted after it. Returns `{ movedProducts, detachedProducts }`.
+- **Uncategorized products.** `GET /products?uncategorized=true` (ignored when `categoryId` is set) — the target of the «Без категории» row. `GET /categories/summary` reports how many active products have no category and their value.
+- `GET /categories/:id/full` strips `costPrice` from the products preview for a SELLER (the products controller does the same).
+
 ## Markets domain rules
 
 - `Market` has `name`, `address`, `image`, `phone?`, `workHours?` (free text ≤ 200), `allowSellerSales` (default `false`). `phone`/`workHours` accept `''` to clear (stored as `NULL`).
@@ -243,7 +258,7 @@ Token internals (`auth.service.ts` / `src/interfaces/jwt-payload.interface.ts`):
 ## Seed
 
 - Run `npm run prisma:seed` against an empty/migrated DB. It **wipes all tables** first (incl. `IdempotencyKey`, `ThrottleBucket`).
-- Deterministic (no `Math.random`), relative to "now": 2 markets × (owner + sellers, 5 categories, 25 products, 7 debtors, 45 sales, 18 debts, 9 refunds). Re-seed right before testing the 10-minute seller-cancel rule — the "fresh" debt is created 3 minutes before the seed ran.
+- Deterministic (no `Math.random`), relative to "now": 2 markets × (owner + sellers, 5 categories with colors and a custom order + 1 empty category, 25 products (2 without a category, 1 archived), 7 debtors, 45 sales, 18 debts, 9 refunds). Re-seed right before testing the 10-minute seller-cancel rule — the "fresh" debt is created 3 minutes before the seed ran.
 - The seed also writes the stock journal (≈195 movements per market: opening balances, sales, refunds, restocks, write-offs, one cancelled receipt as `SALE`+`VOID`, an inventory `ADJUSTMENT`) and archives one product per market; it throws if `Σ delta ≠ quantity` for any product.
 - Coverage is intentional, so no screen/query is empty: debtor scenarios (reliable / overdue + over credit limit / due soon / advance / settled / no due date / new), debts with advance, partial and full payments, notes, refund reasons, partial + repeated refunds, markup + seller payouts, low/zero/dead stock, products without `costPrice`, sales today/yesterday/last year (for period comparisons), varied hours (heatmap).
 - Profiles: owners/admin/most sellers have a `phone`; the first seller of market 1 has `passwordChangedAt` 12 days ago, the rest `null` (covers both states of the security row); one seller has no phone.

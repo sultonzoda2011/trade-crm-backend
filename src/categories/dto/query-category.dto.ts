@@ -1,12 +1,15 @@
 import { IsBoolean, IsOptional } from 'class-validator'
-import { Type } from 'class-transformer'
+import { Transform } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { BaseQueryDto } from '../../common/dto/base-query.dto'
+import { toBoolean } from '../../products/dto/query-product.dto'
 
 export class QueryCategoryDto extends BaseQueryDto {
-  @ApiPropertyOptional({ description: 'Filter categories that have products (true) or are empty (false)' })
+  @ApiPropertyOptional({
+    description: 'Filter categories that have active products (true) or are empty (false)',
+  })
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(toBoolean)
   @IsBoolean()
   hasProducts?: boolean
 }

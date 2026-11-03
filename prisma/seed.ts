@@ -5,6 +5,8 @@ import 'dotenv/config'
 import {
 	CATEGORY_DATA_1,
 	CATEGORY_DATA_2,
+	EXTRA_CATEGORY_1,
+	EXTRA_CATEGORY_2,
 	DEBTOR_DATA_1,
 	DEBTOR_DATA_2,
 	DebtorSeed,
@@ -151,9 +153,16 @@ async function createMarketWithStaff(spec: MarketSeedSpec): Promise<MarketUsers>
 	return { market, owner, sellers }
 }
 
+interface CategorySeed {
+	name: string
+	description: string
+	color: string | null
+	sortOrder: number
+}
+
 async function createCategories(
 	marketId: string,
-	list: typeof CATEGORY_DATA_1
+	list: readonly CategorySeed[]
 ) {
 	return Promise.all(
 		list.map(c =>
@@ -161,6 +170,8 @@ async function createCategories(
 				data: {
 					name: c.name,
 					description: c.description,
+					color: c.color,
+					sortOrder: c.sortOrder,
 					marketId,
 					image: null
 				}
@@ -942,7 +953,8 @@ async function archiveOne(products: SeedProduct[]) {
 async function seedMarket(
 	label: string,
 	users: MarketUsers,
-	categories: typeof CATEGORY_DATA_1,
+	categories: readonly CategorySeed[],
+	extraCategory: CategorySeed,
 	productList: typeof MARKET_1_PRODUCTS,
 	debtorList: DebtorSeed[]
 ) {
@@ -950,6 +962,13 @@ async function seedMarket(
 
 	const cats = await createCategories(marketId, categories)
 	const products = await createAllProducts(marketId, cats, productList)
+	// Пустая категория и два товара без категории: на этих данных видны экран
+	// «пусто», строка «Без категории» и удаление с переносом.
+	await createCategories(marketId, [extraCategory])
+	await prisma.product.updateMany({
+		where: { id: { in: [products[2].id, products[11].id] } },
+		data: { categoryId: null }
+	})
 	const debtors = await createDebtors(marketId, debtorList)
 	console.log(`  ✓ ${label}: категорий ${cats.length}, товаров ${products.length}, должников ${debtors.length}`)
 
@@ -1013,8 +1032,8 @@ async function main() {
 	const m2 = await createMarketWithStaff(MARKET_2_SPEC)
 
 	console.log('Наполнение рынков (товары, должники, продажи, долги, возвраты)...')
-	await seedMarket('Центральный', m1, CATEGORY_DATA_1, MARKET_1_PRODUCTS, DEBTOR_DATA_1)
-	await seedMarket('Восточный', m2, CATEGORY_DATA_2, MARKET_2_PRODUCTS, DEBTOR_DATA_2)
+	await seedMarket('Центральный', m1, CATEGORY_DATA_1, EXTRA_CATEGORY_1, MARKET_1_PRODUCTS, DEBTOR_DATA_1)
+	await seedMarket('Восточный', m2, CATEGORY_DATA_2, EXTRA_CATEGORY_2, MARKET_2_PRODUCTS, DEBTOR_DATA_2)
 
 	console.log('\n✅ Сидирование завершено!')
 	console.log(`\nУчётные данные (пароль у всех 12345678Aa):`)

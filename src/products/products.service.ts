@@ -192,6 +192,7 @@ export class ProductsService {
 		const where: Prisma.ProductWhereInput = { isActive: !query.archived }
 		if (userMarketId) where.marketId = userMarketId
 		if (query.categoryId) where.categoryId = query.categoryId
+		else if (query.uncategorized) where.categoryId = null
 		if (query.search) {
 			where.name = { contains: query.search, mode: 'insensitive' }
 		}
@@ -292,6 +293,7 @@ export class ProductsService {
 
 		if (userMarketId) where.marketId = userMarketId
 		if (query.categoryId) where.categoryId = query.categoryId
+		else if (query.uncategorized) where.categoryId = null
 		if (query.search) {
 			where.name = { contains: query.search, mode: 'insensitive' }
 		}
@@ -313,6 +315,7 @@ export class ProductsService {
 			]
 			if (userMarketId) conditions.push(Prisma.sql`p."marketId" = ${userMarketId}`)
 			if (query.categoryId) conditions.push(Prisma.sql`p."categoryId" = ${query.categoryId}`)
+			else if (query.uncategorized) conditions.push(Prisma.sql`p."categoryId" IS NULL`)
 			if (query.search) conditions.push(Prisma.sql`p.name ILIKE ${'%' + query.search + '%'}`)
 			if (query.dateFrom) conditions.push(Prisma.sql`p."createdAt" >= ${new Date(query.dateFrom)}`)
 			if (query.dateTo) conditions.push(Prisma.sql`p."createdAt" <= ${new Date(query.dateTo)}`)

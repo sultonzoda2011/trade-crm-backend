@@ -20,6 +20,14 @@ export class QueryProductDto extends BaseQueryDto {
   @IsUUID()
   categoryId?: string
 
+  @ApiPropertyOptional({
+    description: 'true — only products without a category. Ignored when categoryId is set',
+  })
+  @IsOptional()
+  @Transform(toBoolean)
+  @IsBoolean()
+  uncategorized?: boolean
+
   @ApiPropertyOptional({ description: 'Return only products at or below their low-stock threshold' })
   @IsOptional()
   @Transform(toBoolean)
