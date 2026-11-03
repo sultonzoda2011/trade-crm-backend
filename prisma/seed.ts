@@ -145,6 +145,9 @@ async function createMarketWithStaff(spec: MarketSeedSpec): Promise<MarketUsers>
 					// и «не менялся» / без телефона (остальные).
 					phone: i === 0 ? nextPhone() : i === 1 ? null : nextPhone(),
 					passwordChangedAt: i === 0 ? ago(12) : null,
+					// Отключённый продавец с историей: см. MarketSeedSpec.sellers.
+					isActive: s.disabledDaysAgo == null,
+					deactivatedAt: s.disabledDaysAgo == null ? null : ago(s.disabledDaysAgo),
 					image: null
 				}
 			})
@@ -764,20 +767,44 @@ async function syncStock(
 }
 
 /**
- * Баланс продавца = Σ markup по его транзакциям (SALE/DEBT) минус выплаты.
+ * Баланс продавца = Σ markup по его транзакциям (SALE/DEBT) − возвраты − выплаты.
  * Выплат две (30% и 20% накопленного) — остаётся и история выдач, и баланс
- * к выплате.
+ * к выплате. У первого продавца есть ещё и ошибочная выплата, отменённая
+ * встречной записью (сумма в балансе нулевая, обе строки видны в ленте).
  */
 async function createSellerCredits(
 	txs: CreatedTx[],
 	sellers: Seller[],
 	owner: Owner
 ) {
-	for (const seller of sellers) {
+	for (const [index, seller] of sellers.entries()) {
 		const earned = txs
 			.filter(t => t.createdById === seller.id)
 			.reduce((sum, t) => sum + t.items.reduce((s, i) => s + i.markup, 0), 0)
 		if (earned <= 0) continue
+
+		if (index === 0) {
+			const mistaken = Math.max(Math.round((earned * 0.1) / 100) * 100, 100)
+			const original = await prisma.sellerCredit.create({
+				data: {
+					sellerId: seller.id,
+					amount: mistaken,
+					note: 'Выдали не тому человеку',
+					createdById: owner.id,
+					createdAt: ago(14)
+				}
+			})
+			await prisma.sellerCredit.create({
+				data: {
+					sellerId: seller.id,
+					amount: -mistaken,
+					note: 'Отмена: выплата ошибочная',
+					createdById: owner.id,
+					createdAt: ago(13.95),
+					reversalOfId: original.id
+				}
+			})
+		}
 
 		const payouts: [number, number, string][] = [
 			[0.3, 21, 'Частичная выплата накопленной надбавки'],

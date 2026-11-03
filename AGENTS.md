@@ -25,11 +25,11 @@
 - Unit tests use **jest + ts-jest** (`jest.config.js`), no DB access — Prisma is mocked.
 - `jest.config.js`: `rootDir: 'src'`, `testRegex: '.*\\.spec\\.ts$'`, `clearMocks: true`, coverage output `../coverage`.
 - Specs live next to sources as `*.spec.ts`; `tsconfig.build.json` excludes them from the build.
-- 23 spec files cover:
+- 26 spec files cover:
   - `analytics/analytics.service.spec.ts` (sales velocity, stock health, reorder priority, debtor risk, period comparisons)
-  - `auth/auth.service.spec.ts` (login finds the user case-insensitively)
+  - `auth/auth.service.spec.ts` (login finds the user case-insensitively; a disabled account gets `ACCOUNT_DISABLED` only after the right password)
   - `auth/login-throttle.util.spec.ts` (login rate-limit bucket = IP + email)
-  - `auth/strategies/jwt.strategy.spec.ts` (60s user cache & deleted-user eviction)
+  - `auth/strategies/jwt.strategy.spec.ts` (60s user cache, deleted-user eviction, disabled user → `ACCOUNT_DISABLED` and never cached)
   - `common/interceptors/idempotency.interceptor.spec.ts` (`Idempotency-Key` deduplication & replay)
   - `common/services/throttler-storage.service.spec.ts` (Postgres rate-limit storage)
   - `common/utils/period.util.spec.ts` (UTC period window resolution & previous-period calculation)
@@ -43,6 +43,8 @@
   - `profile/profile.service.spec.ts` (earnings only for sellers, email change needs the password, avatar upload/removal order, password-change error codes)
   - `products/products.service.spec.ts` (stock journal on create/restock/write-off/adjust, archive, bulk price, summary, market scoping)
   - `products/dto/query-product.dto.spec.ts` (`?flag=false` parsing, rolling-window range)
+  - `sellers/sellers.service.spec.ts` (**IDOR scoping** for every seller read/write, owner vs admin creation, payout under a row lock — two parallel payouts cannot overpay, cancelling a payout, delete only without history, disable/enable, generated password, list with stats/sorting, summary)
+  - `sellers/sellers-earnings.util.spec.ts` (parsing of balance / period / feed rows; the SQL itself was verified on real Postgres via PGlite) and `sellers/dto/query-seller.dto.spec.ts` (`?withStats=false`, status/period)
   - `transactions/transactions.service.spec.ts` (role restrictions, debtor IDOR, pricing/discount/markup, atomic stock decrement, full & partial refunds, stock journal SALE/REFUND/VOID, archived products)
   - `users/users.service.spec.ts` (last-admin protection on remove/demote)
 
@@ -65,6 +67,7 @@
 - `PrismaService` uses `@prisma/adapter-pg` — the adapter is constructed with the raw `DATABASE_URL` env var, not via PrismaClient's `datasources`.
 - DB config: `prisma.config.ts` (Prisma v7 config file format, not `prisma/schema.prisma` for datasource URLs).
 - Migrations: the repo has no `prisma/migrations/` yet; schema changes ship as idempotent SQL in `prisma/sql/` (run with an `npm run db:*` script) and must leave the DB identical to what `prisma db push` would create.
+- **Sellers migration**: `npm run db:sellers` (`prisma/sql/20261103_sellers.sql`) — adds `User.isActive BOOLEAN NOT NULL DEFAULT true`, nullable `User.deactivatedAt`, nullable unique `SellerCredit.reversalOfId` (self-FK, `ON DELETE SET NULL`) and indexes `(marketId, role, isActive)` / `(sellerId, createdAt)`. Additive, safe to re-run; everyone stays active, existing payouts stay as they are, an old backend keeps working on the new schema.
 - **Categories migration**: `npm run db:categories` (`prisma/sql/20261102_categories.sql`) — adds nullable `Category.color`, `Category.sortOrder INTEGER NOT NULL DEFAULT 0` and index `(marketId, sortOrder)`. Additive, safe to re-run; existing categories keep `sortOrder = 0`, so they sort alphabetically until the owner reorders.
 - **Market settings migration**: `npm run db:market-settings` (`prisma/sql/20261101_market_settings.sql`) — adds nullable `Market.phone`, `Market.workHours` and `Market.allowSellerSales BOOLEAN NOT NULL DEFAULT false`. Additive, safe to re-run; an old backend keeps working on the new schema and existing markets stay on the old behaviour (sellers record debts only).
 - **Profile migration**: `npm run db:profile` (`prisma/sql/20261031_profile.sql`) — adds nullable `User.phone` and `User.passwordChangedAt`. Additive, safe to re-run; old backend keeps working on the new schema.
@@ -114,13 +117,23 @@ All paths below are under the `/api` prefix.
 | categories | `categories` | ADMIN, OWNER, SELLER (read) | `GET /` (owner order, active products count, stock value for ADMIN/OWNER), `GET /:id`, `GET /:id/full`; **ADMIN+OWNER only**: `POST /` (multipart), `GET /summary`, `PUT /order`, `PATCH /:id` (multipart), `DELETE /:id?moveTo=<id>\|detach=true` |
 | products | `products` | ADMIN, OWNER, SELLER | `POST /` (multipart, **ADMIN+OWNER**), `GET /` (metrics + filters), `GET /:id`, `PATCH /:id` (multipart, **ADMIN+OWNER**), `POST /:id/restock` (**ADMIN+OWNER**), `DELETE /:id` (**ADMIN+OWNER**) |
 | markets | `markets` | ADMIN, OWNER | `POST /` (multipart, **ADMIN only**), `GET /`, `GET /:id` (+SELLER, own market), `GET /:id/overview` (+SELLER, own market), `GET /:id/full` (deprecated), `PATCH /:id` (multipart, ADMIN+OWNER; owner change **ADMIN only**), `PATCH /:id/settings` (JSON, ADMIN+OWNER), `DELETE /:id` (**ADMIN only**) |
-| sellers | `sellers` | OWNER, ADMIN | `POST /` (multipart), `GET /`, `GET /:id`, `GET /:id/full`, `PATCH /:id` (multipart), `DELETE /:id` |
+| sellers | `sellers` | OWNER, ADMIN | `POST /` (multipart; ADMIN must send `marketId`), `GET /` (`status`, `period`, `withStats`, sort by `sold`/`earned`/`balance`/`lastSaleAt`), `GET /summary`, `GET /:id`, `GET /:id/full`, `PATCH /:id` (multipart), `DELETE /:id` (409 `SELLER_HAS_HISTORY` if any receipts/payments/payouts), `POST /:id/deactivate`, `POST /:id/activate`, `POST /:id/reset-password` (returns the new password once, `Cache-Control: no-store`), `GET /:id/balance`, `GET /:id/earnings`, `POST /:id/credits` (payout), `POST /:id/credits/:creditId/reverse`, `GET /:id/credits` |
 | debtors | `debtors` | none (SELLER allowed) | `POST /` (`@Idempotent()`), `GET /`, `GET /:id`, `GET /:id/full`, `PATCH /:id`, `DELETE /:id` (**ADMIN+OWNER**) |
 | profile | `profile` | none (any authed user) | `GET /`, `GET /full` (profile + market + `earnings` for sellers), `GET /earnings` (**SELLER**), `PATCH /` (multipart), `DELETE /image`, `PATCH /password` |
 | users | `users` | ADMIN | `POST /` (multipart), `GET /`, `GET /:id`, `GET /:id/full`, `PATCH /:id` (multipart), `DELETE /:id` |
 | transactions | `transactions` | none (SELLER allowed, restricted in service) | `POST /` (`@Idempotent()`), `GET /` (+`summary`), `GET /:id`, `PATCH /:id` (**ADMIN+OWNER**), `DELETE /:id` (**ADMIN+OWNER**), `PATCH /:id/pay` (`@Idempotent()`), `POST /:id/refund` (`@Idempotent()`, **ADMIN+OWNER**) |
 | dashboard | `dashboard` | ADMIN, OWNER | `GET /`, `GET /sellers-report` |
 | health | `health` | `@Public()` | `GET /` → `{status, database, timestamp}`; `SELECT 1` probe, 503 on failure |
+
+### Seller money (`src/sellers/sellers-earnings.util.ts`)
+
+- A seller earns the **markup** (`TransactionItem.markup`) of their own SALE/DEBT. A refund takes it back from the seller of the *original* sale (`refundOfItem → transaction.createdById`), not from whoever processed the refund. A payout is a `SellerCredit` row.
+- **There is no stored balance**: `balance = earned − refunded − paidOut`, recomputed from receipts and payouts on every request by one SQL (`fetchBalances`) that serves the list, the card, the profile and the payout check — so it cannot drift from the receipts. Negative balance = overpaid (e.g. an old receipt was deleted after the payout); `pendingInDebts` is the part of `earned` sitting in DEBT receipts still `ACTIVE`/`PARTIAL` (informational, the owner decides whether to pay it).
+- `GET /sellers/:id/earnings` is a feed of the same three sources; `amount` is the signed effect on the balance, so **Σ feed = balance** (checked on real Postgres, see the spec header).
+- Payout and cancellation run in one DB transaction under `SELECT … FOR UPDATE` on the seller's `User` row; the balance is re-read inside it. A refund/sale does not take that lock, so in a rare race the balance can end up negative — it is shown as overpaid, not hidden.
+- Payouts are never edited or deleted. A mistaken one is cancelled by an offsetting row with a negative `amount` and `reversalOfId` (unique → one cancellation per payout; a cancellation cannot be cancelled), so Σ `amount` stays "handed over".
+- Disabling (`User.isActive = false`): `AuthService.login` answers 403 `ACCOUNT_DISABLED` (after the password check) and `JwtStrategy` 401 `ACCOUNT_DISABLED` once its 60 s cache expires. History is kept; a seller with any history cannot be deleted. `POST /:id/reset-password` generates a 10-character password (no look-alike characters) and does not revoke earlier tokens — they live until they expire (auth rework is out of scope).
+- Lists: `GET /sellers` is a plain DB page unless `withStats=true` or a stats sort is requested; then all matching sellers (≤ 500) are computed and sorted in memory (working sellers first). Pickers must not pass `withStats`. `dateFrom/dateTo/period` are the stats window (default: current month), no longer a `createdAt` filter.
 
 ### Shared domain helpers & service decomposition
 
@@ -144,7 +157,7 @@ All paths below are under the `/api` prefix.
 > Every read/write of a market-owned entity passes the caller's `marketId` down to the service, and a cross-market hit throws **`NotFoundException`, never `ForbiddenException`** — so record existence is not leaked.
 
 - Controllers compute scope with `marketScope(user)` (`src/markets/market-scope.util.ts`): ADMIN is unscoped (`undefined`), OWNER and SELLER get their own `marketId`, and staff without a market get `NO_MARKET_SCOPE` (an id no market has). Never write `user.role === Role.OWNER ? user.marketId : undefined` again: it left a SELLER unscoped and an OWNER without `marketId` able to read every market.
-- Enforced in `markets.service.ts`, `products.service.ts` (`getProductOrThrow` / `restock`), `debtors.service.ts`, `sellers.service.ts`, `transactions.service.ts`.
+- Enforced in `markets.service.ts`, `products.service.ts` (`getProductOrThrow` / `restock`), `debtors.service.ts`, `sellers.service.ts` (controller passes `marketScope(user)` everywhere; admin creates sellers into an explicit `marketId`), `transactions.service.ts`.
 - Enforce it inside raw SQL too — e.g. `products.service.ts` and `dashboard-*.service.ts` push `marketId` into `$queryRaw` conditions.
 - Regression tests: `markets.service.spec.ts` → `describe('MarketsService (IDOR scoping)')`, `products.service.spec.ts`, `transactions.service.spec.ts`.
 
@@ -263,7 +276,8 @@ Token internals (`auth.service.ts` / `src/interfaces/jwt-payload.interface.ts`):
 - Coverage is intentional, so no screen/query is empty: debtor scenarios (reliable / overdue + over credit limit / due soon / advance / settled / no due date / new), debts with advance, partial and full payments, notes, refund reasons, partial + repeated refunds, markup + seller payouts, low/zero/dead stock, products without `costPrice`, sales today/yesterday/last year (for period comparisons), varied hours (heatmap).
 - Profiles: owners/admin/most sellers have a `phone`; the first seller of market 1 has `passwordChangedAt` 12 days ago, the rest `null` (covers both states of the security row); one seller has no phone.
 - Markets: both have `phone` and `workHours`. «Центральный» has `allowSellerSales = false` (the usual case), «Восточный» `true`. Seed history has seller-made sales in both markets regardless of the flag (the seed bypasses the rule; the flag only governs new records).
-- Logins (password `12345678Aa` for all): `admin@tradecrm.com` (ADMIN); `alisher@tradecrm.com`, `dilnoza@tradecrm.com` (OWNER); sellers `sultonzoda2011@gmail.com`, `bakhtiyar@`, `madina@` (market 1, @tradecrm.com except the first) and `jasur@`, `nigora@` (market 2).
+- Sellers: `madina@` (market 1) is **disabled** 3 days ago but keeps her receipts and debts — she covers the «Отключены» filter and the card of a disabled seller (she cannot log in). Every seller with markup has two payouts; the first seller of market 1 also has a mistaken payout cancelled by an offsetting row (`reversalOfId`). Balances come out positive and are computed by the app from receipts, not stored.
+- Logins (password `12345678Aa` for all): `admin@tradecrm.com` (ADMIN); `alisher@tradecrm.com`, `dilnoza@tradecrm.com` (OWNER); sellers `sultonzoda2011@gmail.com`, `bakhtiyar@`, `madina@` (disabled — cannot log in) (market 1, @tradecrm.com except the first) and `jasur@`, `nigora@` (market 2).
 - No images are uploaded (all `image` fields are null).
 
 ## .env required vars

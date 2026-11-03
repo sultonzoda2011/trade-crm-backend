@@ -17,6 +17,7 @@
 		"db:profile": "prisma db execute --file prisma/sql/20261031_profile.sql",
 		"db:market-settings": "prisma db execute --file prisma/sql/20261101_market_settings.sql",
 		"db:categories": "prisma db execute --file prisma/sql/20261102_categories.sql",
+		"db:sellers": "prisma db execute --file prisma/sql/20261103_sellers.sql",
 		"test": "jest",
 		"test:watch": "jest --watch",
 		"test:cov": "jest --coverage"

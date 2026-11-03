@@ -8,7 +8,12 @@ export interface MarketSeedSpec {
 	/** Могут ли продавцы оформлять обычные продажи (не только долги). */
 	allowSellerSales: boolean
 	owner: { name: string; email: string }
-	sellers: Array<{ name: string; email: string }>
+	/**
+	 * `disabledDaysAgo` — продавец отключён столько дней назад: входить не может,
+	 * но чеки и выплаты остались (на этих данных видны фильтр «Отключены» и
+	 * карточка отключённого продавца).
+	 */
+	sellers: Array<{ name: string; email: string; disabledDaysAgo?: number }>
 }
 
 export const MARKET_1_SPEC: MarketSeedSpec = {
@@ -22,7 +27,7 @@ export const MARKET_1_SPEC: MarketSeedSpec = {
 	sellers: [
 		{ name: 'Султонзода', email: 'sultonzoda2011@gmail.com' },
 		{ name: 'Бахтияр Рахимов', email: 'bakhtiyar@tradecrm.com' },
-		{ name: 'Мадина Юсупова', email: 'madina@tradecrm.com' }
+		{ name: 'Мадина Юсупова', email: 'madina@tradecrm.com', disabledDaysAgo: 3 }
 	]
 }
 

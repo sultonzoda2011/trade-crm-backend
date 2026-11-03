@@ -42,4 +42,17 @@ describe('AuthService.login', () => {
 		prisma.user.findFirst.mockResolvedValueOnce({ id: 'u1', email: 'a@x.com', role: 'OWNER', password: passwordHash })
 		await expect(service.login('a@x.com', 'Wrong1234')).rejects.toThrow(UnauthorizedException)
 	})
+
+	it('a disabled account cannot log in — but only someone with the right password learns that', async () => {
+		const disabled = { id: 'u1', email: 'a@x.com', role: 'SELLER', password: passwordHash, isActive: false }
+
+		prisma.user.findFirst.mockResolvedValueOnce(disabled)
+		await expect(service.login('a@x.com', 'Secret123')).rejects.toMatchObject({
+			response: { code: 'ACCOUNT_DISABLED' }
+		})
+		expect(jwt.signAsync).not.toHaveBeenCalled()
+
+		prisma.user.findFirst.mockResolvedValueOnce(disabled)
+		await expect(service.login('a@x.com', 'Wrong1234')).rejects.toThrow(UnauthorizedException)
+	})
 })

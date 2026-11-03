@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { compare } from 'bcrypt'
 import { JwtPayload } from '../interfaces'
@@ -26,6 +26,11 @@ export class AuthService {
 		const isPasswordValid = await compare(password, user.password)
 		if (!isPasswordValid) {
 			throw new UnauthorizedException('Invalid email or password')
+		}
+		// Проверяем после пароля: человеку без верного пароля не сообщаем,
+		// что такой аккаунт существует и отключён.
+		if (user.isActive === false) {
+			throw new ForbiddenException({ message: 'Account is disabled', code: 'ACCOUNT_DISABLED' })
 		}
 
 		return this.generateTokens(user.id, user.email, user.role as any, {

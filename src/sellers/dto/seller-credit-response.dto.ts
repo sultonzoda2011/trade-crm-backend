@@ -15,7 +15,7 @@ export class SellerCreditResponseDto {
   @ApiProperty()
   sellerId: string
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Negative for a cancellation entry.' })
   amount: number
 
   @ApiPropertyOptional()
@@ -26,4 +26,10 @@ export class SellerCreditResponseDto {
 
   @ApiPropertyOptional({ type: SellerCreditUserDto })
   createdBy?: SellerCreditUserDto
+
+  @ApiPropertyOptional({ description: 'Set on a cancellation entry: the payout it cancels.' })
+  reversalOfId?: string | null
+
+  @ApiProperty({ description: 'true when this payout has been cancelled.' })
+  isReversed: boolean
 }
