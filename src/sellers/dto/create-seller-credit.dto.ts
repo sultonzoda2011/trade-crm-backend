@@ -7,7 +7,7 @@ export class CreateSellerCreditDto {
     description:
       'Amount to pay out to the seller now. Can be less than the current balance — payouts can be made in parts.'
   })
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.01)
   amount: number
 

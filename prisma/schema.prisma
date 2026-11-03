@@ -18,6 +18,11 @@ model User {
   image         String?
   phone         String?
   passwordChangedAt DateTime?
+  // Отключённый сотрудник не может войти, но остаётся в базе со всей историей
+  // (чеки, платежи, выплаты ссылаются на него). Удалить продавца с историей
+  // нельзя — его отключают. Включить обратно можно в любой момент.
+  isActive      Boolean        @default(true)
+  deactivatedAt DateTime?
   ownedMarkets  Market[]       @relation("MarketOwner")
   payments      Payment[]
   transactions  Transaction[]
@@ -27,6 +32,7 @@ model User {
   stockMovements  StockMovement[]
 
   @@index([marketId])
+  @@index([marketId, role, isActive])
 }
 
 model Market {
@@ -247,9 +253,14 @@ model Payment {
   @@index([createdById])
 }
 
-// Учёт выдачи накопленных надбавок (markup) продавцу. Баланс продавца —
-// это Σ TransactionItem.markup по его транзакциям минус Σ SellerCredit.amount.
-// Выдавать можно частями (amount может быть меньше текущего баланса).
+// Учёт выплат продавцу из накопленных надбавок (markup). Баланс продавца —
+// это Σ TransactionItem.markup по его SALE/DEBT минус markup возвращённых строк
+// минус Σ SellerCredit.amount; хранимого числа нет, поэтому разойтись с чеками
+// он не может. Выплачивать можно частями (amount ≤ баланса), выплата и проверка
+// баланса идут в одной транзакции БД под блокировкой строки продавца.
+// Строки не редактируются и не удаляются. Ошибочную выплату отменяет встречная
+// запись с отрицательной суммой и reversalOfId на исходную (одна отмена на
+// выплату — unique): Σ amount по-прежнему равна «выдано на руки».
 model SellerCredit {
   id          String   @id @default(uuid())
   sellerId    String
@@ -257,10 +268,14 @@ model SellerCredit {
   note        String?
   createdById String
   createdAt   DateTime @default(now())
+  reversalOfId String? @unique
   seller      User     @relation("SellerCredits", fields: [sellerId], references: [id])
   createdBy   User     @relation("CreditsGivenBy", fields: [createdById], references: [id])
+  reversalOf  SellerCredit?  @relation("SellerCreditReversal", fields: [reversalOfId], references: [id])
+  reversal    SellerCredit?  @relation("SellerCreditReversal")
 
   @@index([sellerId])
+  @@index([sellerId, createdAt])
 }
 
 // Персистентное хранилище rate limiting (PrismaThrottlerStorage).

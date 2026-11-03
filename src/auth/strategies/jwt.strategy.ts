@@ -45,13 +45,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 				role: true,
 				name: true,
 				marketId: true,
-				image: true
+				image: true,
+				isActive: true
 			}
 		})
 
 		if (!user) {
 			this.cache.delete(payload.sub)
 			throw new UnauthorizedException('User no longer exists')
+		}
+		// Отключённый продавец: токен ещё не истёк, но войти он больше не может.
+		// Живая сессия закрывается, как только истечёт кеш (≤ 60 секунд).
+		if (user.isActive === false) {
+			this.cache.delete(payload.sub)
+			throw new UnauthorizedException({ message: 'Account is disabled', code: 'ACCOUNT_DISABLED' })
 		}
 
 		const result: JwtPayload = {

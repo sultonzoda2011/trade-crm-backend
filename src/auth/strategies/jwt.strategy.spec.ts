@@ -51,6 +51,19 @@ describe('JwtStrategy', () => {
 			expect(strategy['cache'].has('user-1')).toBe(false)
 		})
 
+		it('rejects a disabled user with ACCOUNT_DISABLED and does not cache them', async () => {
+			prisma.user.findUnique.mockResolvedValue({ ...userRow, isActive: false })
+			await expect(strategy.validate(payload)).rejects.toMatchObject({
+				response: { code: 'ACCOUNT_DISABLED' }
+			})
+			expect(strategy['cache'].has('user-1')).toBe(false)
+		})
+
+		it('lets an active user through', async () => {
+			prisma.user.findUnique.mockResolvedValue({ ...userRow, isActive: true })
+			await expect(strategy.validate(payload)).resolves.toMatchObject({ sub: 'user-1' })
+		})
+
 		it('builds a payload from the fetched user', async () => {
 			prisma.user.findUnique.mockResolvedValue(userRow)
 			const result = await strategy.validate(payload)
