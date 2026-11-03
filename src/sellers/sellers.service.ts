@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import {
 	BadRequestException,
 	ConflictException,
+	ForbiddenException,
 	Injectable,
 	NotFoundException,
 	UnauthorizedException
@@ -340,7 +341,11 @@ export class SellersService {
 	}
 
 	/** Отключить продавца: вход закрыт, история и выплаты остаются. */
-	async deactivate(id: string, marketId?: string) {
+	async deactivate(id: string, marketId?: string, actorId?: string) {
+		// Владелец, который сам в списке продавцов, не должен запереть себя: войти обратно будет некому.
+		if (actorId && actorId === id) {
+			throw new ForbiddenException(coded('You cannot disable your own account', 'SELLER_CANNOT_DISABLE_SELF'))
+		}
 		const seller = await this.findOne(id, marketId)
 		if (!seller.isActive) return seller
 		return this.prisma.user.update({

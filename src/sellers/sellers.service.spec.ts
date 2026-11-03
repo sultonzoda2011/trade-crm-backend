@@ -326,6 +326,13 @@ describe('SellersService', () => {
 			expect(storage.delete).not.toHaveBeenCalled()
 		})
 
+		it('deactivate refuses to lock the caller out of their own account', async () => {
+			await expect(service.deactivate('s1', 'market-1', 's1')).rejects.toMatchObject({
+				response: expect.objectContaining({ code: 'SELLER_CANNOT_DISABLE_SELF' })
+			})
+			expect(prisma.user.update).not.toHaveBeenCalled()
+		})
+
 		it('deactivate stamps the time; a repeat call changes nothing', async () => {
 			await service.deactivate('s1', 'market-1')
 			const data = prisma.user.update.mock.calls[0][0].data

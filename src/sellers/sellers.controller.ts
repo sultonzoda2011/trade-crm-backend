@@ -180,7 +180,7 @@ export class SellersController {
 	@ApiParam({ name: 'id', type: String, format: 'uuid' })
 	@ApiOkResponse({ type: SellerResponseDto })
 	deactivate(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
-		return this.sellersService.deactivate(id, marketScope(user))
+		return this.sellersService.deactivate(id, marketScope(user), user.id)
 	}
 
 	@Post(':id/activate')
