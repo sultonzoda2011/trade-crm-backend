@@ -47,6 +47,33 @@ class EnvironmentVariables {
 
   @IsString()
   CLOUDINARY_API_SECRET: string
+
+  // Telegram-поддержка (src/support). Все необязательные: пока не заданы,
+  // webhook'и отвечают 401 и ничего не делают. Секреты — только в env хостинга.
+  @IsString()
+  @IsOptional()
+  SUPPORT_BOT_TOKEN?: string
+
+  @IsString()
+  @IsOptional()
+  ADMIN_BOT_TOKEN?: string
+
+  @IsString()
+  @IsOptional()
+  SUPPORT_WEBHOOK_SECRET?: string
+
+  @IsString()
+  @IsOptional()
+  ADMIN_WEBHOOK_SECRET?: string
+
+  /** Telegram user ID админов через запятую. */
+  @IsString()
+  @IsOptional()
+  TELEGRAM_ADMIN_IDS?: string
+
+  @IsString()
+  @IsOptional()
+  SUPPORT_TIMEZONE?: string
 }
 
 export function validate(config: Record<string, unknown>) {

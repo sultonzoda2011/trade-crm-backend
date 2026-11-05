@@ -18,6 +18,8 @@
 		"db:market-settings": "prisma db execute --file prisma/sql/20261101_market_settings.sql",
 		"db:categories": "prisma db execute --file prisma/sql/20261102_categories.sql",
 		"db:sellers": "prisma db execute --file prisma/sql/20261103_sellers.sql",
+		"db:support": "prisma db execute --file prisma/sql/20261105_support.sql",
+		"support:webhook": "ts-node scripts/support-webhook.ts",
 		"test": "jest",
 		"test:watch": "jest --watch",
 		"test:cov": "jest --coverage"
