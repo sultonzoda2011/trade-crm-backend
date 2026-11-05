@@ -348,3 +348,105 @@ model IdempotencyKey {
 
   @@index([createdAt])
 }
+
+// ── Telegram-поддержка ──────────────────────────────────────────────────────
+// Два бота: публичный Support (клиенты, без аккаунта в CRM) и приватный Admin
+// (только TELEGRAM_ADMIN_IDS). Telegram user ID клиента — технический
+// идентификатор диалога, а не пользователь TradeCRM.
+// Модель «один постоянный чат на клиента», без тикетов: вся переписка хранится
+// без срока, а «требует ответа» — флаг, который ставит сообщение клиента и
+// снимает ответ админа или кнопка «Готово». Колонки direction/kind — TEXT,
+// значения проверяются в коде (src/support), чтобы не плодить enum-типы.
+
+model SupportConversation {
+  id             String    @id @default(uuid())
+  // Постоянный короткий номер чата («#12») — им админ видит клиента в Admin-боте.
+  number         Int       @unique @default(autoincrement())
+  telegramUserId BigInt    @unique
+  username       String?
+  firstName      String?
+  lastName       String?
+  languageCode   String?
+  needsReply     Boolean   @default(false)
+  // Блокировка админом: сообщения такого клиента не сохраняются и не доходят.
+  isBlocked      Boolean   @default(false)
+  // Telegram вернул 403 — клиент остановил или заблокировал Support-бота.
+  botBlockedAt   DateTime?
+  lastInboundAt  DateTime?
+  lastMessageAt  DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  messages       SupportMessage[]
+  adminMessages  SupportAdminMessage[]
+
+  @@index([needsReply, lastMessageAt])
+  @@index([lastMessageAt])
+}
+
+model SupportMessage {
+  id              String    @id @default(uuid())
+  conversationId  String
+  // IN — от клиента, OUT — ответ админа.
+  direction       String
+  // text | photo | document | voice | audio | video | video_note | sticker | location | contact
+  kind            String
+  // Текст сообщения или подпись к файлу.
+  text            String?
+  fileName        String?
+  mimeType        String?
+  fileSize        Int?
+  // file_id привязан к боту: в Support-боте и в Admin-боте один и тот же файл
+  // имеет разные file_id, поэтому храним оба.
+  sourceFileId    String?
+  targetFileId    String?
+  // message_id в чате-источнике (IN — сообщение клиента, OUT — сообщение админа)
+  // и первой копии в чате-получателе. (conversationId, direction, sourceMessageId)
+  // unique: повторная доставка webhook не создаёт дубль.
+  sourceMessageId Int?
+  targetMessageId Int?
+  // Когда доставлено получателю (IN — админу, OUT — клиенту).
+  deliveredAt     DateTime?
+  deliveryError   String?
+  createdAt       DateTime  @default(now())
+  conversation    SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, direction, sourceMessageId])
+  @@index([conversationId, createdAt])
+}
+
+// «Сообщение в Admin-боте → чат клиента». Благодаря этой таблице ответ свайпом
+// (reply) всегда уходит тому клиенту, чьё сообщение выбрал админ, а не
+// «последнему активному».
+model SupportAdminMessage {
+  id             String   @id @default(uuid())
+  chatId         BigInt
+  messageId      Int
+  conversationId String
+  // На последнем сообщении чата висят inline-кнопки; со старых их снимаем.
+  hasKeyboard    Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, messageId])
+  @@index([conversationId, hasKeyboard])
+}
+
+// Режим «Ответить»: следующие сообщения админа уходят в этот чат до activeUntil.
+// Хранится в БД, а не в памяти: serverless-инстансы не делят память.
+model SupportAdminState {
+  adminTelegramId      BigInt    @id
+  activeConversationId String?
+  activeUntil          DateTime?
+  updatedAt            DateTime  @updatedAt
+}
+
+// Идемпотентность webhook: Telegram повторяет update при таймауте или 5xx.
+model SupportUpdate {
+  bot       String
+  updateId  BigInt
+  attempts  Int      @default(1)
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@id([bot, updateId])
+  @@index([createdAt])
+}

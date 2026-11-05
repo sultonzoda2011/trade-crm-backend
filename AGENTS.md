@@ -12,6 +12,7 @@
 | `npm run prisma:seed` | Seed DB via `ts-node prisma/seed.ts` |
 | `npm run prisma:studio` | Open Prisma Studio GUI |
 | `npm run prisma:deploy` | `prisma migrate deploy` — apply migrations in CI/prod |
+| `npm run support:webhook` | Register the Telegram support webhooks (`-- --info` shows state, `-- --delete` removes them) |
 | `npm test` (or `npx jest`) | Run unit tests (jest + ts-jest) |
 | `npm run test:watch` | Run tests in watch mode |
 | `npm run test:cov` | Run tests with coverage |
@@ -25,7 +26,7 @@
 - Unit tests use **jest + ts-jest** (`jest.config.js`), no DB access — Prisma is mocked.
 - `jest.config.js`: `rootDir: 'src'`, `testRegex: '.*\\.spec\\.ts$'`, `clearMocks: true`, coverage output `../coverage`.
 - Specs live next to sources as `*.spec.ts`; `tsconfig.build.json` excludes them from the build.
-- 26 spec files cover:
+- 34 spec files cover:
   - `analytics/analytics.service.spec.ts` (sales velocity, stock health, reorder priority, debtor risk, period comparisons)
   - `auth/auth.service.spec.ts` (login finds the user case-insensitively; a disabled account gets `ACCOUNT_DISABLED` only after the right password)
   - `auth/login-throttle.util.spec.ts` (login rate-limit bucket = IP + email)
@@ -47,6 +48,7 @@
   - `sellers/sellers-earnings.util.spec.ts` (parsing of balance / period / feed rows; the SQL itself was verified on real Postgres via PGlite) and `sellers/dto/query-seller.dto.spec.ts` (`?withStats=false`, status/period)
   - `transactions/transactions.service.spec.ts` (role restrictions, debtor IDOR, pricing/discount/markup, atomic stock decrement, full & partial refunds, stock journal SALE/REFUND/VOID, archived products)
   - `users/users.service.spec.ts` (last-admin protection on remove/demote)
+  - `support/*.spec.ts` (8 files: message normalizing; Bot API client never leaks the token into errors; relay between the two bots incl. captions, 20 MB limit and re-upload; webhook secret fail-closed + update idempotency + retry policy; **Admin-bot access control** — a stranger gets no reply and no DB access, every button re-checks the ID; reply routing — swipe-reply beats active mode, unknown target sends nothing; Support-bot flow; config parsing; HTTP run with the real global guards, ValidationPipe and a throttler limit of 2/min. The SQL was verified on real Postgres via PGlite against `schema.prisma`)
 
 ## CI
 
@@ -67,13 +69,14 @@
 - `PrismaService` uses `@prisma/adapter-pg` — the adapter is constructed with the raw `DATABASE_URL` env var, not via PrismaClient's `datasources`.
 - DB config: `prisma.config.ts` (Prisma v7 config file format, not `prisma/schema.prisma` for datasource URLs).
 - Migrations: the repo has no `prisma/migrations/` yet; schema changes ship as idempotent SQL in `prisma/sql/` (run with an `npm run db:*` script) and must leave the DB identical to what `prisma db push` would create.
+- **Support migration**: `npm run db:support` (`prisma/sql/20261105_support.sql`) — creates `SupportConversation`, `SupportMessage`, `SupportAdminMessage`, `SupportAdminState`, `SupportUpdate` (+ indexes, 2 FKs with `ON DELETE CASCADE`). Only creates new tables, safe to re-run, touches no existing data; an old backend ignores them. `direction`/`kind`/`bot` are plain `TEXT` (checked in code), so there are no new enum types. Columns, indexes and constraints were compared with `schema.prisma` on PGlite; `prisma db push` itself could not run in the sandbox (no schema-engine binary).
 - **Sellers migration**: `npm run db:sellers` (`prisma/sql/20261103_sellers.sql`) — adds `User.isActive BOOLEAN NOT NULL DEFAULT true`, nullable `User.deactivatedAt`, nullable unique `SellerCredit.reversalOfId` (self-FK, `ON DELETE SET NULL`) and indexes `(marketId, role, isActive)` / `(sellerId, createdAt)`. Additive, safe to re-run; everyone stays active, existing payouts stay as they are, an old backend keeps working on the new schema.
 - **Categories migration**: `npm run db:categories` (`prisma/sql/20261102_categories.sql`) — adds nullable `Category.color`, `Category.sortOrder INTEGER NOT NULL DEFAULT 0` and index `(marketId, sortOrder)`. Additive, safe to re-run; existing categories keep `sortOrder = 0`, so they sort alphabetically until the owner reorders.
 - **Market settings migration**: `npm run db:market-settings` (`prisma/sql/20261101_market_settings.sql`) — adds nullable `Market.phone`, `Market.workHours` and `Market.allowSellerSales BOOLEAN NOT NULL DEFAULT false`. Additive, safe to re-run; an old backend keeps working on the new schema and existing markets stay on the old behaviour (sellers record debts only).
 - **Profile migration**: `npm run db:profile` (`prisma/sql/20261031_profile.sql`) — adds nullable `User.phone` and `User.passwordChangedAt`. Additive, safe to re-run; old backend keeps working on the new schema.
 - **Stock journal migration**: `npm run db:stock-movements` (`prisma/sql/20261029_stock_movements.sql`) — creates `StockMovement`, adds `Product.isActive/archivedAt`, backfills each non-zero stock as an `OPENING` movement. Safe to re-run; keeps all data.
 - Run `prisma generate` after any schema change (`npm run prisma:generate`), otherwise `npx tsc` will fail against stale types.
-- Models: `User, Market, Category, Product, StockMovement, Debtor, Transaction, TransactionItem, Payment, SellerCredit, ThrottleBucket, IdempotencyKey`.
+- Models: `User, Market, Category, Product, StockMovement, Debtor, Transaction, TransactionItem, Payment, SellerCredit, ThrottleBucket, IdempotencyKey`, plus the Telegram support set `SupportConversation, SupportMessage, SupportAdminMessage, SupportAdminState, SupportUpdate`.
 - `Transaction` has a self-relation for refunds (`refundOfId String?`, relation `"TransactionRefund"`), plus composite indexes `@@index([marketId, type, createdAt])` and `@@index([createdById, type, createdAt])`.
 - `TransactionItem` stores `price`, `discount`, `markup`, `totalPrice`, `refundedQuantity`, and `refundOfItemId` to support line-level discounts/markups and partial refunds.
 - `PrismaService.onModuleInit()` sweeps stale `ThrottleBucket` rows and expired `IdempotencyRecord` rows (`expiresAt < now()`), wrapped in try/catch so a missing migration doesn't crash boot.
@@ -123,6 +126,7 @@ All paths below are under the `/api` prefix.
 | users | `users` | ADMIN | `POST /` (multipart), `GET /`, `GET /:id`, `GET /:id/full`, `PATCH /:id` (multipart), `DELETE /:id` |
 | transactions | `transactions` | none (SELLER allowed, restricted in service) | `POST /` (`@Idempotent()`), `GET /` (+`summary`), `GET /:id`, `PATCH /:id` (**ADMIN+OWNER**), `DELETE /:id` (**ADMIN+OWNER**), `PATCH /:id/pay` (`@Idempotent()`), `POST /:id/refund` (`@Idempotent()`, **ADMIN+OWNER**) |
 | dashboard | `dashboard` | ADMIN, OWNER | `GET /`, `GET /sellers-report` |
+| support | `telegram` | `@Public()`, `@SkipThrottle()` | `POST /support/webhook`, `POST /admin/webhook` — Telegram webhooks; auth is the `X-Telegram-Bot-Api-Secret-Token` header (per bot), not JWT. Hidden from Swagger |
 | health | `health` | `@Public()` | `GET /` → `{status, database, timestamp}`; `SELECT 1` probe, 503 on failure |
 
 ### Seller money (`src/sellers/sellers-earnings.util.ts`)
@@ -134,6 +138,19 @@ All paths below are under the `/api` prefix.
 - Payouts are never edited or deleted. A mistaken one is cancelled by an offsetting row with a negative `amount` and `reversalOfId` (unique → one cancellation per payout; a cancellation cannot be cancelled), so Σ `amount` stays "handed over".
 - Disabling (`User.isActive = false`): `AuthService.login` answers 403 `ACCOUNT_DISABLED` (after the password check) and `JwtStrategy` 401 `ACCOUNT_DISABLED` once its 60 s cache expires. History is kept; a seller with any history cannot be deleted. `POST /:id/reset-password` generates a 10-character password (no look-alike characters) and does not revoke earlier tokens — they live until they expire (auth rework is out of scope).
 - Lists: `GET /sellers` is a plain DB page unless `withStats=true` or a stats sort is requested; then all matching sellers (≤ 500) are computed and sorted in memory (working sellers first). Pickers must not pass `withStats`. `dateFrom/dateTo/period` are the stats window (default: current month), no longer a `createdAt` filter.
+
+### Telegram support (`src/support/`)
+
+- **Two bots, one account is enough to test.** `@tradecrmsupport_bot` (public: any client, no CRM account) and `@tradecrmadmin_bot` (only `TELEGRAM_ADMIN_IDS`). The Telegram user ID of a client is a technical conversation key, not a CRM user. The same person may be admin and client at once: the Support bot gives no special rights to any ID.
+- **Model: one permanent chat per client, no tickets.** `SupportConversation` (`number` = the permanent `#12`, `telegramUserId` unique) → `SupportMessage` (everything is kept, nothing is deleted). `needsReply` is set by a client message and cleared by an admin reply or the «Готово» button; a new client message revives the chat. No open/closed states, no categories or forms: the client just writes (text, photo, document, voice, audio, video, video note, sticker as text, location, contact).
+- **Never mixing up chats.** Every message the admin bot shows carries `#N Name` and is recorded in `SupportAdminMessage (chatId, messageId) → conversation`. A reply is routed by (1) swipe-reply → that mapping, (2) «Ответить» mode (`SupportAdminState`, in the DB, expires after 15 min), (3) otherwise **nothing is sent** and the admin gets a hint. A swipe on an unknown message never falls back to "the last chat".
+- **Access.** Admin bot: every update and every callback checks `from.id ∈ TELEGRAM_ADMIN_IDS` and private chat; strangers get no answer at all. Webhooks: `X-Telegram-Bot-Api-Secret-Token` compared in constant time, **fail-closed** (no secret configured → 401), a separate secret per bot. Webhook routes are `@Public()` + `@SkipThrottle()`; the body type is an interface, so the global `ValidationPipe` does not touch Telegram fields.
+- **Delivery.** Inbound is at-least-once: `SupportUpdate (bot, updateId)` dedupes webhook retries; an error → 500 so Telegram retries, the 3rd failed attempt answers 200 and gives up (a poison update must not block the queue). `SupportMessage` is unique by `(conversationId, direction, sourceMessageId)` and has `deliveredAt`, so a retry neither duplicates a row nor forwards twice. Outbound (admin → client) is at-most-once: a failure is shown to the admin, never retried automatically; a 403 sets `botBlockedAt`.
+- **Files.** A `file_id` belongs to one bot, so a file is downloaded from the sending bot and uploaded to the other (`TelegramRelay`); both ids are stored (`sourceFileId`/`targetFileId`). The Bot API download limit is 20 MB: a bigger file is not transferred and the admin sees a note. Files live in Telegram, not in our storage.
+- **Safety details.** User text is sent **without `parse_mode`** (a client cannot inject markup/links into the admin chat). `TelegramApiError` never contains the request URL (it holds the bot token); only the first line of an error is logged. Rate limit 20 messages/min per client (extra ones are dropped silently); the admin can block a client (not an admin ID); blocked clients' messages are not stored.
+- **Env** (all optional; the feature is off until set): `SUPPORT_BOT_TOKEN`, `ADMIN_BOT_TOKEN`, `SUPPORT_WEBHOOK_SECRET`, `ADMIN_WEBHOOK_SECRET`, `TELEGRAM_ADMIN_IDS` (comma-separated), `SUPPORT_TIMEZONE` (default `Asia/Dushanbe`), `SUPPORT_PUBLIC_URL` (only for the script). Secrets live in the hosting env — never in Git, Markdown or logs.
+- **Rollout:** `npm run db:support` → env on Vercel → deploy → `npm run support:webhook` → press `/start` once in the Admin bot (a bot cannot write first) → write to the Support bot from the same account to test.
+- Texts are Russian only and live in `support.texts.ts`; adding en/tg later means picking by `SupportConversation.languageCode`.
 
 ### Shared domain helpers & service decomposition
 

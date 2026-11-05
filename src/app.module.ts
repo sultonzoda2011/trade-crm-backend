@@ -17,6 +17,7 @@ import { PrismaService } from './prisma/prisma.service'
 import { ProductsModule } from './products/products.module'
 import { ProfileModule } from './profile/profile.module'
 import { SellersModule } from './sellers/sellers.module'
+import { SupportModule } from './support/support.module'
 import { TransactionsModule } from './transactions/transactions.module'
 import { UsersModule } from './users/users.module'
 
@@ -51,6 +52,7 @@ import { UsersModule } from './users/users.module'
 		DebtorsModule,
 		TransactionsModule,
 		DashboardModule,
+		SupportModule,
 		HealthModule
 	],
 	providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }]
