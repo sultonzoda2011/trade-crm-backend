@@ -48,13 +48,13 @@ export function chatKeyboard(
 	return {
 		inline_keyboard: [
 			[
-				{ text: 'Ответить', callback_data: `r:${n}` },
-				{ text: 'Готово', callback_data: `d:${n}` }
+				{ text: '💬 Ответить', callback_data: `r:${n}` },
+				{ text: '✅ Готово', callback_data: `d:${n}` }
 			],
 			[
-				{ text: 'История', callback_data: `h:${n}:0` },
+				{ text: '🗂 История', callback_data: `h:${n}:0` },
 				{
-					text: conv.isBlocked ? 'Разблокировать' : 'Заблокировать',
+					text: conv.isBlocked ? '🔓 Разблокировать' : '🚫 Заблокировать',
 					callback_data: `b:${n}`
 				}
 			]
@@ -63,12 +63,12 @@ export function chatKeyboard(
 }
 
 export const cancelKeyboard: TgReplyMarkup = {
-	inline_keyboard: [[{ text: 'Отмена', callback_data: 'c:0' }]]
+	inline_keyboard: [[{ text: '✖️ Отмена', callback_data: 'c:0' }]]
 }
 
 /** Постоянные кнопки внизу Admin-бота (без слэш-команд). */
-export const MENU_PENDING = 'Требуют ответа'
-export const MENU_ALL = 'Все чаты'
+export const MENU_PENDING = '🔴 Требуют ответа'
+export const MENU_ALL = '📋 Все чаты'
 export const menuKeyboard: TgReplyMarkup = {
 	keyboard: [[{ text: MENU_PENDING }, { text: MENU_ALL }]],
 	resize_keyboard: true,

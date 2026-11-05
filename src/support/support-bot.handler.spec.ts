@@ -59,7 +59,7 @@ describe('SupportBotHandler', () => {
 		await handler.handle(update() as any)
 		expect(service.recordInbound).toHaveBeenCalledWith('c1', expect.objectContaining({ kind: 'text', text: 'Нужен доступ' }), 10)
 		expect(service.touchInbound).toHaveBeenCalledWith('c1')
-		expect(api.call).toHaveBeenCalledWith('support', 'sendMessage', expect.objectContaining({ text: expect.stringContaining('Принято') }))
+		expect(api.call).toHaveBeenCalledWith('support', 'sendMessage', expect.objectContaining({ text: expect.stringContaining('получили') }))
 		const call = relay.relay.mock.calls[0][0]
 		expect(call).toMatchObject({ from: 'support', to: 'admin', chatId: ADMIN })
 		expect(call.prefix).toBe('#12 Али (@ali)')
@@ -75,7 +75,7 @@ describe('SupportBotHandler', () => {
 		expect(edits.map(([, , p]) => p.message_id)).toEqual([41, 42])
 	})
 
-	it('"Принято" is sent only for the first message or after a long pause', async () => {
+	it('"получили" ack is sent only for the first message or after a long pause', async () => {
 		service.upsertContact.mockResolvedValue(conv({ lastInboundAt: new Date(Date.now() - 60_000) }))
 		await handler.handle(update() as any)
 		expect(api.call.mock.calls.filter(([bot]) => bot === 'support')).toHaveLength(0)
@@ -118,7 +118,7 @@ describe('SupportBotHandler', () => {
 	it('unsupported types get an explanation and are not stored', async () => {
 		await handler.handle(update({ text: undefined, poll: {} }) as any)
 		expect(service.recordInbound).not.toHaveBeenCalled()
-		expect(api.call.mock.calls[0][2].text).toContain('не принимаю')
+		expect(api.call.mock.calls[0][2].text).toContain('пока не понимаю')
 	})
 
 	it('groups, bots and edited messages are ignored', async () => {

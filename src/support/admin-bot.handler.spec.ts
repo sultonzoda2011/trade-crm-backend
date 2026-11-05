@@ -1,4 +1,5 @@
 import { AdminBotHandler } from './admin-bot.handler'
+import { MENU_PENDING } from './support-format.util'
 import { TelegramApiError } from './telegram-api.service'
 
 const ADMIN = 1000000001
@@ -194,12 +195,12 @@ describe('AdminBotHandler', () => {
 			expect(service.setActive).toHaveBeenCalledWith(ADMIN, 'c1')
 		})
 
-		it('"Готово" clears needsReply', async () => {
+		it('"✅ Готово" clears needsReply', async () => {
 			await handler.handle(callback('d:12') as any)
 			expect(service.setNeedsReply).toHaveBeenCalledWith('c1', false)
 		})
 
-		it('"Отмена" turns the mode off', async () => {
+		it('"✖️ Отмена" turns the mode off', async () => {
 			await handler.handle(callback('c:0') as any)
 			expect(service.clearActive).toHaveBeenCalledWith(ADMIN)
 		})
@@ -257,7 +258,7 @@ describe('AdminBotHandler', () => {
 			service.listNeedingReply.mockResolvedValue([
 				{ ...conv(), messages: [{ direction: 'IN', kind: 'text', text: 'нужен доступ', createdAt: new Date() }] }
 			])
-			await handler.handle(message({ text: 'Требуют ответа' }) as any)
+			await handler.handle(message({ text: MENU_PENDING }) as any)
 			const sent = api.call.mock.calls[0][2]
 			expect(sent.text).toContain('#12 Али')
 			expect(sent.reply_markup.inline_keyboard[0][0].callback_data).toBe('v:12')
@@ -265,7 +266,7 @@ describe('AdminBotHandler', () => {
 
 		it('menu text sent as a swipe-reply is a reply to the client, not a menu command', async () => {
 			service.findConversationByAdminMessage.mockResolvedValue(conv())
-			await handler.handle(message({ text: 'Требуют ответа', reply_to_message: { message_id: 77 } }) as any)
+			await handler.handle(message({ text: MENU_PENDING, reply_to_message: { message_id: 77 } }) as any)
 			expect(service.listNeedingReply).not.toHaveBeenCalled()
 			expect(relay.relay).toHaveBeenCalled()
 		})

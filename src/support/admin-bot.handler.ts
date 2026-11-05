@@ -256,13 +256,13 @@ export class AdminBotHandler {
 			return
 		}
 
-		const title = mode === 'pending' ? 'Требуют ответа' : 'Последние чаты'
+		const title = mode === 'pending' ? '🔴 Требуют ответа' : '📋 Последние чаты'
 		const lines = rows.map((row) => this.listLine(row))
 		await this.say(chatId, `${title}:\n\n${lines.join('\n')}`, {
 			inline_keyboard: listButtons(
 				rows.map((row) => ({
 					number: row.number,
-					label: `#${row.number} ${displayName(row)}${row.needsReply ? ' •' : ''}`
+					label: `${row.needsReply ? '🔴' : '✅'} #${row.number} ${displayName(row)}`
 				}))
 			)
 		})
@@ -271,16 +271,17 @@ export class AdminBotHandler {
 	private listLine(row: ConversationWithLast): string {
 		const last = row.messages[0]
 		const preview = last ? previewOf(last.kind, last.text, 60) : 'нет сообщений'
-		const who = last?.direction === 'OUT' ? 'вы: ' : ''
-		return `#${row.number} ${displayName(row)} · ${formatAgo(row.lastMessageAt)}\n${who}${preview}`
+		const who = last?.direction === 'OUT' ? '↩️ вы: ' : '💬 '
+		const flag = row.needsReply ? '🔴 ' : ''
+		return `${flag}#${row.number} ${displayName(row)} · ${formatAgo(row.lastMessageAt)}\n${who}${preview}`
 	}
 
 	private async showCard(chatId: number, conversation: SupportConversation): Promise<void> {
 		const total = await this.service.countMessages(conversation.id)
 		const status = [
-			conversation.needsReply ? 'ждёт ответа' : 'без ожидания',
-			conversation.isBlocked ? 'заблокирован' : null,
-			conversation.botBlockedAt ? 'остановил бота' : null
+			conversation.needsReply ? '🔴 ждёт ответа' : '✅ без ожидания',
+			conversation.isBlocked ? '🚫 заблокирован' : null,
+			conversation.botBlockedAt ? '⏸ остановил бота' : null
 		]
 			.filter(Boolean)
 			.join(', ')
@@ -303,7 +304,7 @@ export class AdminBotHandler {
 		}
 		const zone = this.config.timezone
 		const lines = messages.map((message) => {
-			const who = message.direction === 'IN' ? 'Клиент' : 'Вы'
+			const who = message.direction === 'IN' ? '👤 Клиент' : '↩️ Вы'
 			return `${who} · ${formatTime(message.createdAt, zone)}\n${previewOf(message.kind, message.text, 200)}`
 		})
 		const more: TgReplyMarkup | undefined = hasMore
@@ -320,7 +321,7 @@ export class AdminBotHandler {
 			: undefined
 		await this.say(
 			chatId,
-			`История ${chatPrefix(conversation)}:\n\n${lines.join('\n\n')}`,
+			`🗂 История ${chatPrefix(conversation)}:\n\n${lines.join('\n\n')}`,
 			more
 		)
 	}
